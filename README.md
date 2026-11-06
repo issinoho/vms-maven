@@ -28,13 +28,21 @@ changes** over the signed upstream binary distribution:
 $ @SYS$STARTUP:OPENJDK$SETUP.COM          ! Java 8
 $ SET PROCESS/PARSE_STYLE=EXTENDED       ! keep the case of arguments
 $ MVN :== $DISK$USER:[USERNAME.VMS_MAVEN.APACHE-MAVEN-3_9_16.BIN]MVN.EXE
-$ MVN -B package -DforkCount=0
+$ PIPE MVN -B package > build.log
 ```
 
 - Under the TRADITIONAL parse style (the default, and what batch jobs get), arguments not in
   quotes reach Maven in lower case. The launcher prints a note when Maven then fails.
-- surefire cannot fork its test JVM (it starts it through `/bin/sh`): use
-  `-DforkCount=0` for now (docs/DECISIONS.md D5).
+- Plugins that start programs through `/bin/sh` (surefire's forked test JVM) get
+  `MVNSH.EXE`, which runs the `cd DIR && PROGRAM ARGS` form they use; the launcher maps
+  `/bin/sh` to it through VSI Java's `JAVA$EXEC_MAPPING_nn`.
+- **Quotas:** Java on OpenVMS wants FILLM 4096 and PGFLQUOTA 2097152 (HP's Java user
+  guide). A forked test JVM shares them with Maven's, so with a default account's quotas
+  larger builds fail ("unable to create new native thread"); the launcher says so when a
+  build fails. Its default JVM sizes are small for the same reason; `MAVEN_OPTS` and
+  `.mvn/jvm.config` override them.
+- To keep a build's output in a file, use `PIPE MVN ... > file`: with
+  `DEFINE/USER SYS$OUTPUT`, each process in the chain writes its own version.
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL
   symbols or logical names. `MAVEN_VMS_TRACE` prints the Java command line.
 
@@ -43,6 +51,7 @@ $ MVN -B package -DforkCount=0
 | Patch | What | Why |
 |---|---|---|
 | 0001 | resolver: close a tracking file before deleting it | OpenVMS cannot delete an open file; every download failed (NOTES N2) |
+| 0002 | conf/settings.xml: small argLine for forked tests on OpenVMS | the forked JVM shares Maven's pooled quotas (N12) |
 
 ## Building
 

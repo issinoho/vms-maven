@@ -45,8 +45,11 @@ tools/vms.sh <node> dcl '<cmd>'  # run DCL; also run/batch/put/get
   Relative Unix paths resolve against the default directory.
 - **OpenVMS cannot delete an open file** (patch 0001). Look for this first when a
   `FileSystemException: ... file currently locked by another user` appears.
-- **Nothing can run `/bin/sh`**: anything that forks through a shell (surefire's forked
-  tests) fails; `forkCount=0` runs tests in Maven's JVM.
+- **`/bin/sh` is MVNSH.EXE**, through `JAVA$EXEC_MAPPING_nn` set by MVN.EXE (N12); it
+  only runs `cd DIR && PROGRAM ARGS`. `JAVA$EXEC_TRACE` shows every process Java starts.
+- **Quotas are pooled per job**: a forked test JVM shares FILLM and PGFLQUOTA with Maven's
+  (N12, N14). Concurrent builds in tests are separate batch jobs, not SPAWNs.
+- **Capture output with `PIPE mvn ... > file`**, not `DEFINE/USER SYS$OUTPUT` (N13).
 - **A batch job starts in SYS$LOGIN**, not the work directory: procedures set their own
   default from `f$environment("procedure")`.
 - **Don't name a DCL symbol after a command** you call (`jar = ...` replaced `JAR`).
