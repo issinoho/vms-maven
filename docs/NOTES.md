@@ -119,3 +119,32 @@ PGFLQUOTA) was used up by Maven's JVM and its jars. HP's Java user guide recomme
 FILLM 4096 and PGFLQUOTA 2097152 (plus larger BYTLM, BIOLM, DIOLM, TQELM); this account
 has 148 and 504592. MVN.EXE now names the low quotas when a build fails. Raising them
 (AUTHORIZE, then a new login) is for the system manager; the tests in Phase 2 wait on it.
+
+## N15. File versions: VSI Java's JAVA$*_ALL_VERSIONS (2026-11-06)
+
+With FILLM 4096 and PGFLQUOTA 2097152 the reactor build, shaded jar, install and deploy
+pass. Two problems remained, both from file versions: after two installs the local
+repository held 3 versions of core-1.0.jar, and `clean` failed ("Failed to delete
+.../target/..."), since Java's delete removes only the newest version. VSI's JAVA$VMS_SHR
+and JAVA$NIO_SHR read JAVA$DELETE_ALL_VERSIONS, JAVA$RENAME_ALL_VERSIONS and
+JAVA$CREATE_DIR_WITH_OWNER_DELETE (HP's Java user guide: TRUE deletes/renames all versions;
+new directories get owner delete). MVN.EXE now sets all three unless defined. Not yet
+tested: see N17.
+
+## N16. Two builds sharing a repository need the resolver's file locks
+
+Two batch jobs filling one empty local repository: with the resolver's default
+(in-JVM) locking one failed with `apache-33.pom.lastUpdated: file currently locked by
+another user`; with `aether.syncContext.named.factory=file-lock` and
+`nameMapper=file-gav` both passed. On Unix the race goes unnoticed; on OpenVMS another
+process's open file cannot be opened for write. MVN.EXE now passes these as JVM
+defaults (a user's -D overrides them).
+
+## N17. tools.jar disappeared from the IA64 JDK (2026-11-06, 22:16-22:21)
+
+`javac` and Maven's compiler stopped working: "Could not find or load main class
+com.sun.tools.javac.Main". SYS$COMMON:[openjdk$80.lib]tools.jar, which PCSI lists for
+OPENJDK80, is gone; the last compile that used it finished at 22:16:27 (the concurrent
+builds of test_projects), and BUILD.COM's javac failed at 22:21. Nothing this port runs
+deletes outside its work tree, and tools.jar was not moved into it; cause unknown, raised
+with the user. Until it is restored, nothing that compiles Java runs on IA64.

@@ -26,6 +26,11 @@
    ("/bin/sh=<image>"); the launcher adds one for /bin/sh that points at
    MVNSH.EXE next to it (mvnsh.c), unless one already maps /bin/sh.
 
+   It also sets VSI Java's JAVA$DELETE_ALL_VERSIONS, JAVA$RENAME_ALL_VERSIONS
+   and JAVA$CREATE_DIR_WITH_OWNER_DELETE (unless defined), and makes the
+   resolver lock files across processes (file-lock), since two builds
+   sharing a local repository collide on OpenVMS's file locks otherwise.
+
    Environment variables are read with getenv(), so each may be a DCL symbol
    or a logical name.  MAVEN_VMS_TRACE (any value) prints the Java command.
 
@@ -52,7 +57,9 @@
 #define MAXARGS 1024
 
 #define DEFAULT_JVM_OPTS \
-  "-Xms16m -Xmx128m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=32m"
+  "-Xms16m -Xmx128m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=32m " \
+  "-Daether.syncContext.named.factory=file-lock " \
+  "-Daether.syncContext.named.nameMapper=file-gav"
 
 static const char *prog = "mvn";
 static char *jargv[MAXARGS];
@@ -320,6 +327,24 @@ classworlds_jar (const char *home)
   return found;
 }
 
+/* VSI Java's file behaviour that Maven needs (NOTES N15), unless the site
+   has set these itself.  Without them a file Java rewrites gets a new
+   version and delete removes only the newest, so the local repository
+   collects versions and "clean" cannot delete target/.  */
+static void
+java_file_settings (void)
+{
+  static const char *names[] = {
+    "JAVA$DELETE_ALL_VERSIONS",
+    "JAVA$RENAME_ALL_VERSIONS",
+    "JAVA$CREATE_DIR_WITH_OWNER_DELETE",
+  };
+  size_t i;
+  for (i = 0; i < sizeof names / sizeof names[0]; i++)
+    if (getenv (names[i]) == NULL)
+      setenv (names[i], "TRUE", 1);
+}
+
 /* Map /bin/sh to MVNSH.EXE for Java (see the top of this file).  */
 static void
 map_sh (const char *home)
@@ -385,6 +410,7 @@ main (int argc, char **argv)
   java = java_image ();
   basedir = find_basedir (argc, argv);
   map_sh (home);
+  java_file_settings ();
 
   add ("java");
   /* Small-footprint defaults (NOTES N12): a forked test JVM shares this
