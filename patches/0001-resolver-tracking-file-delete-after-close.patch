@@ -1,0 +1,45 @@
+Subject: resolver: on OpenVMS, close a tracking file before deleting it
+
+DefaultTrackingFileManager.delete() opens the tracking file (*.lastUpdated,
+_remote.repositories), locks it, and deletes it while the channel is still
+open. Unix lets a process delete an open file, and the JDK on Windows opens
+files with FILE_SHARE_DELETE, but OpenVMS refuses: Files.delete() fails with
+"file currently locked by another user", so every artifact download ended in
+an UncheckedIOException and the build failed.
+
+On OpenVMS take the lock as before (it still waits out another Maven process
+that is writing the file), release it and close the file, then delete. The
+window between the two is the same one a Maven process on Windows has had
+with older JDKs. Other systems keep the upstream behaviour.
+
+Fits upstream (apache/maven-resolver) as an os.name check; to be offered there.
+
+--- a/vmsport/src/maven-resolver-impl/org/eclipse/aether/internal/impl/DefaultTrackingFileManager.java	2026-11-06 20:14:59.226193062 +0000
++++ b/vmsport/src/maven-resolver-impl/org/eclipse/aether/internal/impl/DefaultTrackingFileManager.java	2026-11-06 20:14:59.231838996 +0000
+@@ -120,13 +120,24 @@
+         }
+     }
+ 
++    private static final boolean IS_OPENVMS =
++            System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("openvms");
++
+     @Override
+     public boolean delete(File file) {
+         Path path = file.toPath();
+         if (Files.isReadable(path)) {
+             synchronized (mutex(path)) {
+-                try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.WRITE);
+-                        FileLock unused = fileLock(fileChannel, false)) {
++                try {
++                    // OpenVMS cannot delete a file that is still open, so take the
++                    // lock to wait out other writers, release it, then delete.
++                    try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.WRITE);
++                            FileLock unused = fileLock(fileChannel, false)) {
++                        if (!IS_OPENVMS) {
++                            Files.delete(path);
++                            return true;
++                        }
++                    }
+                     Files.delete(path);
+                     return true;
+                 } catch (NoSuchFileException e) {
