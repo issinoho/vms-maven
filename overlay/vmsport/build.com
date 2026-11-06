@@ -1,6 +1,7 @@
 $! BUILD.COM [ALL|CLEAN] - build the VMS parts of the Maven tree this [.VMSPORT] is in:
 $!
 $!   [.BIN]MVN.EXE   the launcher (mvn.c, vms_crtl_init.c)
+$!   [.BIN]MVNSH.EXE the /bin/sh plugins get (mvnsh.c)
 $!   [.LIB]*.JAR     the jars listed in PATCHED.LIS, with the patched classes
 $!                   compiled from [.VMSPORT.SRC.<artifact>] put back in;
 $!                   the upstream jars are kept in [.VMSPORT.PRISTINE]
@@ -28,6 +29,7 @@ $   if f$search("[.vmsport.pristine]*.jar") .nes. "" then -
        copy/nolog [.vmsport.pristine]*.jar;0 [.lib]*.*
 $   purge/nolog [.lib]*.jar
 $   if f$search("[.bin]mvn.exe") .nes. "" then delete/nolog [.bin]mvn.exe;*
+$   if f$search("[.bin]mvnsh.exe") .nes. "" then delete/nolog [.bin]mvnsh.exe;*
 $   if f$search("[.vmsport.obj]*.*") .nes. "" then delete/nolog [.vmsport.obj]*.*;*
 $   if f$search("[.vmsport.classes...]*.class") .nes. "" then -
        delete/nolog [.vmsport.classes...]*.class;*
@@ -40,6 +42,8 @@ $ ccq = "/names=(as_is,shortened)/warnings=(disable=(emptyfile))/object=[.vmspor
 $ cc'ccq' [.vmsport]mvn.c
 $ if .not. $status then errors = errors + 1
 $ cc'ccq' [.vmsport]vms_crtl_init.c
+$ if .not. $status then errors = errors + 1
+$ cc'ccq' [.vmsport]mvnsh.c
 $ if .not. $status then errors = errors + 1
 $ if errors .gt. 0
 $ then
@@ -55,6 +59,17 @@ $   goto done
 $ endif
 $ purge/nolog [.bin]mvn.exe
 $ write sys$output "BUILD: [.BIN]MVN.EXE"
+$! MVNSH.EXE: without vms_crtl_init (no ARGV_PARSE_STYLE needed: Java passes
+$! its arguments through execv, case intact).
+$ link/executable=[.bin]mvnsh.exe/notraceback [.vmsport.obj]mvnsh.obj
+$ if .not. $status
+$ then
+$   write sys$output "%BUILD-E-LINK, MVNSH.EXE did not link"
+$   errors = errors + 1
+$   goto done
+$ endif
+$ purge/nolog [.bin]mvnsh.exe
+$ write sys$output "BUILD: [.BIN]MVNSH.EXE"
 $!
 $! ---- the patched jars --------------------------------------------------------
 $ if f$type(javac) .eqs. "" then @SYS$STARTUP:OPENJDK$SETUP.COM

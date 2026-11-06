@@ -1,0 +1,43 @@
+Subject: conf/settings.xml: on OpenVMS, a small default argLine for forked tests
+
+surefire and failsafe fork the test JVM as a subprocess of Maven's JVM
+(through MVNSH.EXE, which the launcher maps /bin/sh to). On OpenVMS a
+subprocess draws on its job's pooled quotas, so both JVMs share one page
+file quota, and with Java's default sizes the forked JVM failed to start
+("Could not reserve enough space for object heap", "malloc failed",
+"OutOfMemoryError: Metaspace") under a quota of about 250 MB (NOTES N12).
+
+A profile activated by the OS family "openvms" sets the argLine property,
+which surefire and failsafe use when the project sets no argLine, to a small
+heap, the serial collector and a small code cache. Nothing changes on other
+systems.
+
+VMS-only, not for upstream.
+
+--- a/conf/settings.xml	2026-11-06 21:08:01.073758160 +0000
++++ b/conf/settings.xml	2026-11-06 21:29:22.394679400 +0000
+@@ -252,6 +252,24 @@
+       </properties>
+     </profile>
+     -->
++
++    <!-- OpenVMS: a forked test JVM (surefire, failsafe) shares the page file
++         quota of Maven's own JVM, since a subprocess draws on its job's pooled
++         quotas; with the JVM's default sizes the second one cannot start.
++         This argLine keeps it small. A project that sets its own argLine
++         replaces it: add these options there, or raise PGFLQUOTA.
++         (vms-maven, docs/DECISIONS.md D5) -->
++    <profile>
++      <id>openvms</id>
++      <activation>
++        <os>
++          <family>openvms</family>
++        </os>
++      </activation>
++      <properties>
++        <argLine>-Xms8m -Xmx64m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=16m</argLine>
++      </properties>
++    </profile>
+   </profiles>
+ 
+   <!-- activeProfiles

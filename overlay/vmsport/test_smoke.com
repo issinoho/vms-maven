@@ -67,8 +67,7 @@ $ uhello = uspec
 $!
 $! 1. mvn -v: the launcher finds Java and the Maven home.
 $ t = "mvn -v"
-$ define/user sys$output t1.out
-$ mvn -v
+$ pipe mvn -v > t1.out
 $ st = $status
 $ want = "Apache Maven 3.9.16"
 $ gosub has
@@ -81,9 +80,11 @@ $ if .not. (ok1 .and. found .and. st) then gosub fail
 $!
 $! 2. Build the project: plugins from Central, javac, JUnit (in-process), jar.
 $ set default [.hello]
-$ t = "mvn package (download, compile, test, jar)"
-$ define/user sys$output [-]t2.out
-$ mvn -B -ntp "''r'" -DforkCount=0 package
+$! surefire forks its test JVM through /bin/sh = MVNSH.EXE (the launcher's
+$! JAVA$EXEC_MAPPING), with patch 0002's small argLine.
+$ want = "Running com.example.HelloTest"
+$ t = "mvn package (download, compile, forked JUnit test, jar)"
+$ pipe mvn -B -ntp "''r'" package > [-]t2.out
 $ st = $status
 $ set default [-]
 $ want = "Tests run: 1, Failures: 0, Errors: 0"
@@ -93,8 +94,7 @@ $ if .not. (st .and. found .and. f$search("[.hello.target]hello-1^.0-SNAPSHOT.ja
 $!
 $! 3. The jar it built runs.
 $ t = "the built jar runs"
-$ define/user sys$output t3.out
-$ java "-cp" "''uhello'/target/hello-1.0-SNAPSHOT.jar" "com.example.Hello"
+$ pipe java "-cp" "''uhello'/target/hello-1.0-SNAPSHOT.jar" "com.example.Hello" > t3.out
 $ want = "Hello from Maven on OpenVMS"
 $ gosub has
 $ if found then gosub pass
@@ -103,8 +103,7 @@ $!
 $! 4. Arguments keep their case: -DskipTests reaches Maven as typed.
 $ set default [.hello]
 $ t = "-DskipTests keeps its case"
-$ define/user sys$output [-]t4.out
-$ mvn -B -ntp "''r'" -DskipTests package
+$ pipe mvn -B -ntp "''r'" -DskipTests package > [-]t4.out
 $ st = $status
 $ set default [-]
 $ want = "Tests are skipped."
@@ -116,8 +115,7 @@ $!
 $! 5. A failed build gives an error status, as Java's exit(1) does.
 $ set default [.hello]
 $ t = "a failed build returns an error status"
-$ define/user sys$output [-]t5.out
-$ mvn -B -ntp "''r'" nosuchphase
+$ pipe mvn -B -ntp "''r'" nosuchphase > [-]t5.out
 $ st = $status
 $ set default [-]
 $ want = "Unknown lifecycle phase"
@@ -137,9 +135,7 @@ $ close cfg
 $ set default [.hello.src.main]
 $ maven_opts = "-Dvms.smoke=opts"
 $ maven_vms_trace = "1"
-$ define/user sys$error 'work't6.err
-$ define/user sys$output 'work't6.out
-$ mvn -v
+$ pipe mvn -v 2> 'work't6.err > 'work't6.out
 $ st = $status
 $ delete/symbol/local maven_opts
 $ delete/symbol/local maven_vms_trace
@@ -165,8 +161,7 @@ $ delete/nolog [.hello]^.mvn.dir;*
 $!
 $! 7. -f names the project from another directory.
 $ t = "-f hello/pom.xml from the directory above"
-$ define/user sys$output t7.out
-$ mvn -B -ntp -q "''r'" -f hello/pom.xml validate
+$ pipe mvn -B -ntp -q "''r'" -f hello/pom.xml validate > t7.out
 $ st = $status
 $ if st then gosub pass
 $ if .not. st then gosub fail
@@ -175,9 +170,7 @@ $! 8. The TRADITIONAL parse style lower-cases -DskipTests; the launcher says why
 $ t = "TRADITIONAL parse style note"
 $ set process/parse_style=traditional
 $ set default [.hello]
-$ define/user sys$error 'work't8.err
-$ define/user sys$output 'work't8.out
-$ mvn -B -DskipTests -X nosuchphase
+$ pipe mvn -B -DskipTests -X nosuchphase 2> 'work't8.err > 'work't8.out
 $ st = $status
 $ set process/parse_style=extended
 $ set default 'work'

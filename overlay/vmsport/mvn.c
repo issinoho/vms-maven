@@ -13,11 +13,18 @@
      - finds the project base directory: the nearest directory at or above
        the current one (or the -f/--file argument) that has a .mvn
        subdirectory, or MAVEN_BASEDIR,
-     - reads JVM options from <basedir>/.mvn/jvm.config and MAVEN_OPTS, and
+     - gives Java small-footprint defaults (DEFAULT_JVM_OPTS), then the JVM
+       options from <basedir>/.mvn/jvm.config and MAVEN_OPTS, and
        extra Maven arguments from MAVEN_ARGS,
    and runs Java on the classworlds launcher.  Java is started with vfork and
    execv, so the arguments reach it without passing through DCL again.  The
    exit status is Java's.
+
+   Plugins that start programs (surefire's forked test JVM) run them through
+   /bin/sh -c "cd DIR && PROGRAM ARGS".  VSI's JVM maps a program it starts
+   through the logical names or variables JAVA$EXEC_MAPPING_01, _02, ...
+   ("/bin/sh=<image>"); the launcher adds one for /bin/sh that points at
+   MVNSH.EXE next to it (mvnsh.c), unless one already maps /bin/sh.
 
    Environment variables are read with getenv(), so each may be a DCL symbol
    or a logical name.  MAVEN_VMS_TRACE (any value) prints the Java command.
@@ -43,6 +50,9 @@
 #include <ssdef.h>
 
 #define MAXARGS 1024
+
+#define DEFAULT_JVM_OPTS \
+  "-Xms16m -Xmx128m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=32m"
 
 static const char *prog = "mvn";
 static char *jargv[MAXARGS];
@@ -310,6 +320,50 @@ classworlds_jar (const char *home)
   return found;
 }
 
+/* Map /bin/sh to MVNSH.EXE for Java (see the top of this file).  */
+static void
+map_sh (const char *home)
+{
+  char name[32];
+  int i;
+  for (i = 1; i <= 99; i++)
+    {
+      const char *v;
+      sprintf (name, "JAVA$EXEC_MAPPING_%02d", i);
+      v = getenv (name);
+      if (v == NULL)
+        break;
+      if (strncmp (v, "/bin/sh=", 8) == 0)
+        return;                         /* the site's own mapping */
+    }
+  if (i > 99)
+    return;
+  setenv (name, concat ("/bin/sh=", join (home, "bin/mvnsh.exe")), 1);
+}
+
+/* Java on OpenVMS wants far larger quotas than a default account has (HP's
+   Java user guide: FILLM 4096, PGFLQUOTA 2097152), and a forked test JVM
+   shares them with Maven's JVM (NOTES N12, N14).  Note low ones after a
+   failure, when they may be why.  */
+#define WANT_FILLM 4096
+#define WANT_PGFLQUOTA 2097152
+
+static void
+note_quotas (void)
+{
+  int c1 = JPI$_FILLM, c2 = JPI$_PGFLQUOTA, fillm = 0, pgfl = 0;
+  if (!(lib$getjpi (&c1, 0, 0, &fillm, 0, 0) & 1)
+      || !(lib$getjpi (&c2, 0, 0, &pgfl, 0, 0) & 1))
+    return;
+  if (fillm >= WANT_FILLM && pgfl >= WANT_PGFLQUOTA)
+    return;
+  fprintf (stderr, "%s: note: this account's quotas are low for Java (FILLM %d, "
+           "PGFLQUOTA %d; Java on OpenVMS wants FILLM %d and PGFLQUOTA %d): "
+           "\"unable to create new native thread\", \"could not reserve enough "
+           "space\" or a test JVM that fails to start come from that\n",
+           prog, fillm, pgfl, WANT_FILLM, WANT_PGFLQUOTA);
+}
+
 /* The process's parse style: 1 if EXTENDED.  */
 static int
 parse_extended (void)
@@ -330,8 +384,13 @@ main (int argc, char **argv)
   home = maven_home ();
   java = java_image ();
   basedir = find_basedir (argc, argv);
+  map_sh (home);
 
   add ("java");
+  /* Small-footprint defaults (NOTES N12): a forked test JVM shares this
+     JVM's page file quota.  They come first, so jvm.config and MAVEN_OPTS
+     override them (the JVM takes the last of each option).  */
+  add_words (DEFAULT_JVM_OPTS);
   jvmconfig = read_words (join (basedir, ".mvn/jvm.config"));
   add_words (jvmconfig);
   add_words (getenv ("MAVEN_OPTS"));
@@ -374,6 +433,8 @@ main (int argc, char **argv)
     rc = 1;
   if (rc == 127)
     die ("cannot run Java", java);
+  if (rc != 0)
+    note_quotas ();
   if (rc != 0 && !parse_extended () && argc > 1)
     fprintf (stderr, "%s: note: this process has the TRADITIONAL parse style, so "
              "arguments not in quotes reached Maven in lower case "

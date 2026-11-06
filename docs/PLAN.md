@@ -32,10 +32,14 @@ not yet (ssh to it refused).
 
 Exit: build and smoke test pass on both nodes; the user signs off D4-D6.
 
-## Phase 2: Maven on real projects
+## Phase 2: Maven on real projects (started 2026-11-06)
 
-- Default `conf/settings.xml` with forkCount=0 (D5); look for a way to keep forking (a
-  surefire `jvm` setting that runs java directly, or a fix offered upstream).
+Status 2026-11-06: forked tests work (MVNSH.EXE, D5, N12) and the smoke test passes 8/8
+with them. test_projects.com (reactor, shade, install, deploy, clean, two builds at once)
+is written; on IA64 it fails on the account's quotas (FILLM 150, PGFLQUOTA 512000, N14)
+and waits for them to be raised.
+
+- Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file
   repository; plugins that fork (exec, antrun) and ones that write many files (shade,
   assembly, javadoc).

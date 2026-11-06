@@ -30,11 +30,15 @@ logical MAVEN$ROOT (layout in Phase 4). Kit: ISSINOHO-<I64VMS|X86VMS>-MAVEN-...-
 most eight of them (N4). It starts Java with vfork/execv, so arguments reach Java without
 DCL in between (N5), and returns Java's exit status.
 
-## D5. Tests run in Maven's JVM by default (proposed)
+## D5. Forked tests through our own /bin/sh, with small JVMs (proposed)
 
-surefire forks its test JVM through `/bin/sh` (N6). Until there is a better way, the kit's
-`conf/settings.xml` sets `forkCount=0` in an active-by-default profile, and README.VMS says
-what that changes (tests share Maven's JVM; System.exit in a test ends the build).
+surefire forks its test JVM through `/bin/sh` (N6). Running tests in Maven's JVM
+(`forkCount=0`) avoids that but changes behaviour: tests run in the reactor root, not
+their module (N11). Instead MVN.EXE maps `/bin/sh` to MVNSH.EXE through VSI's
+JAVA$EXEC_MAPPING (N12), so forking works as elsewhere. Because a forked JVM shares the
+job's pooled quotas, MVN.EXE gives Maven's JVM small-footprint defaults and patch 0002's
+`openvms` settings profile gives forked JVMs a small argLine; both are overridden by the
+user's own options. README.VMS asks for Java's recommended quotas (N14).
 
 ## D6. Versions and tags (proposed)
 
