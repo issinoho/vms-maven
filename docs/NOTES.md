@@ -166,7 +166,22 @@ the concurrent build jobs too), so a stray delete fails. With that alarm on IA64
 restored tools.jar, smoke (8/8) and the project tests (7/8) left it in place, and the
 audit journal recorded no attempt to delete it. Both losses came in runs where something
 failed (x86: the forked test JVM; IA64: the concurrent builds before N16's file locks),
-so the delete is probably on a failure path; to be caught with the alarm on x86, whose
-forked tests still fail. The one project failure: core-1.0.jar has 4 versions, but ;1-;3
+so the delete is probably on a failure path. The one project failure: core-1.0.jar has 4 versions, but ;1-;3
 are from 2026-11-06, before N15; a second install no longer adds one.
 maven-metadata-local.xml still gets a new version on every install.
+
+Later the same day, after tools.jar was restored on x86 (OPENJDK80 reinstalled, V8.0-502A,
+OPENJDK17 removed), with the alarm on it too: x86 smoke 8/8 and projects 8/8, no delete
+attempt recorded on either node. The old JDK is not the cause: IA64 was already on
+V8.0-502A when it lost tools.jar, and never had OPENJDK17. Cause still unknown; the alarm
+ACEs stay on both nodes' tools.jar so a future attempt is recorded (ANALYZE/AUDIT).
+
+## N18. x86-64: forked test JVM's channel corrupted on OPENJDK80 V8.0-482A (2026-11-10)
+
+The first x86 smoke test failed in `mvn package`: surefire reported "Corrupted channel by
+directly writing to native stream in forked JVM 1" and "ForkStarter IOException: Stream
+Closed", 0 tests run. The dump showed the forked JVM's binary event frames with their
+0x0A length bytes missing (`:sys-prop:` then `:normal-run:` without the 0x0A between),
+as if the pipe treated LF as a record end. IA64 (V8.0-502A) was fine. After OPENJDK80
+was reinstalled as V8.0-502A and OPENJDK17 removed, the same test passed; which change
+fixed it is unknown. README.VMS should ask for V8.0-502A or later.

@@ -27,8 +27,9 @@ tests and packages a hello-world project from Maven Central with patch 0001 and
 - Smoke test (test_smoke.com): mvn -v, package, the jar runs, case kept, error status,
   base directory + jvm.config + MAVEN_OPTS, -f, the parse style note.
 
-Status 2026-11-06: done on IA64: build clean, smoke test 8/8 (NOTES N8, N9). x86-64
-not yet (ssh to it refused).
+Status 2026-11-06: done on IA64: build clean, smoke test 8/8 (NOTES N8, N9).
+Status 2026-11-10: x86-64 reachable (ssh on a non-standard port, in nodes.conf): build clean, smoke 8/8 on OPENJDK80
+V8.0-502A (N18). Both nodes now; waits only for the user's sign-off of D4-D6.
 
 Exit: build and smoke test pass on both nodes; the user signs off D4-D6.
 
@@ -38,6 +39,11 @@ Status 2026-11-06: forked tests work (MVNSH.EXE, D5, N12) and the smoke test pas
 with them. test_projects.com (reactor, shade, install, deploy, clean, two builds at once)
 is written; on IA64 it fails on the account's quotas (FILLM 150, PGFLQUOTA 512000, N14)
 and waits for them to be raised.
+
+Status 2026-11-10: quotas raised; the tests run without privileges (N17: a Maven run
+twice deleted the JDK's tools.jar, cause unknown, delete alarms set). Projects 8/8 on
+x86-64; 7/8 on IA64, where the version count sees core-1.0.jar versions from before N15.
+maven-metadata-local.xml still gets a new version per install.
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file
