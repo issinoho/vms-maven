@@ -6,6 +6,9 @@ $! use fresh ones in [.VMSPORT.PWORK].
 $! Prints PASS/FAIL per test and "PROJECTS: <n> passed, <m> failed".
 $ set noon
 $ on control_y then goto done
+$! Without privileges: the account may hold SYSPRV, and a Maven run once deleted the
+$! JDK's tools.jar (NOTES N17). A stray delete must fail, not take a system file.
+$ oldprv = f$setprv("NOALL,NETMBX,TMPMBX")
 $ set process/parse_style=extended
 $ proc = f$environment("procedure")
 $ port = f$parse(proc,,,"device") + f$parse(proc,,,"directory")
@@ -157,6 +160,7 @@ $!
 $ done:
 $ set default 'olddef'
 $ write sys$output "PROJECTS: ''passed' passed, ''failed' failed"
+$ oldprv = f$setprv(oldprv)
 $ exit
 $!
 $! concurrent: build multi and multi2 at the same time into a fresh repository.
@@ -174,6 +178,7 @@ $   pd = "multi"
 $   if k .eq. 2 then pd = "multi2"
 $   open/write c c'k'.com
 $   write c "$ set noon"
+$   write c "$ set process/privileges=(noall,netmbx,tmpmbx)"
 $   write c "$ set process/parse_style=extended"
 $   write c "$ @SYS$STARTUP:OPENJDK$SETUP.COM"
 $   write c "$ mvn = ""''mvn'"""

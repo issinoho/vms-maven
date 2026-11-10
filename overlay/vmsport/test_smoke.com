@@ -5,6 +5,9 @@ $! first run downloads Maven's default plugins from Maven Central.
 $! Prints PASS/FAIL per test and "SMOKE: <n> passed, <m> failed".
 $ set noon
 $ on control_y then goto done
+$! Without privileges: the account may hold SYSPRV, and a Maven run once deleted the
+$! JDK's tools.jar (NOTES N17). A stray delete must fail, not take a system file.
+$ oldprv = f$setprv("NOALL,NETMBX,TMPMBX")
 $ set process/parse_style=extended
 $ proc = f$environment("procedure")
 $ port = f$parse(proc,,,"device") + f$parse(proc,,,"directory")
@@ -183,6 +186,7 @@ $!
 $ done:
 $ set default 'olddef'
 $ write sys$output "SMOKE: ''passed' passed, ''failed' failed"
+$ oldprv = f$setprv(oldprv)
 $ exit
 $!
 $ pass:

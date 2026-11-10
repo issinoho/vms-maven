@@ -148,3 +148,25 @@ OPENJDK80, is gone; the last compile that used it finished at 22:16:27 (the conc
 builds of test_projects), and BUILD.COM's javac failed at 22:21. Nothing this port runs
 deletes outside its work tree, and tools.jar was not moved into it; cause unknown, raised
 with the user. Until it is restored, nothing that compiles Java runs on IA64.
+
+2026-11-10, x86-64: it happened again on the first build and smoke test there. tools.jar
+(15690 blocks, owner [SYSTEM], S:RWED,O:RWED,G:RE,W:RE) was present at 12:12; BUILD.COM's
+javac used it at 12:13 and smoke step 2's `mvn package` compiled with it (finished
+12:18:10, the step whose forked test JVM failed); javac failed at 12:33 and the file was
+gone. No file of its size exists anywhere on the system or user disk, so it was deleted,
+not renamed. Only step 2 compiled; later steps did not need tools.jar. Both losses came
+from runs of MVN.EXE with JAVA$DELETE_ALL_VERSIONS / JAVA$RENAME_ALL_VERSIONS set (N15)
+and a forked JVM, by an account whose processes hold SYSPRV (and BYPASS, READALL...),
+which the system protection category gives delete access. The DCL in the tests deletes
+only inside the work tree. ACL alarms are enabled on x86, so an alarm ACE on tools.jar
+(ALARM=SECURITY, ACCESS=DELETE+SUCCESS+FAILURE) would name the process and image.
+
+The tests now drop all privileges but NETMBX and TMPMBX (f$setprv, restored at the end;
+the concurrent build jobs too), so a stray delete fails. With that alarm on IA64's
+restored tools.jar, smoke (8/8) and the project tests (7/8) left it in place, and the
+audit journal recorded no attempt to delete it. Both losses came in runs where something
+failed (x86: the forked test JVM; IA64: the concurrent builds before N16's file locks),
+so the delete is probably on a failure path; to be caught with the alarm on x86, whose
+forked tests still fail. The one project failure: core-1.0.jar has 4 versions, but ;1-;3
+are from 2026-11-06, before N15; a second install no longer adds one.
+maven-metadata-local.xml still gets a new version on every install.
