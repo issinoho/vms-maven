@@ -43,6 +43,20 @@ $ PIPE MVN -B package > build.log
   `.mvn/jvm.config` override them.
 - To keep a build's output in a file, use `PIPE MVN ... > file`: with
   `DEFINE/USER SYS$OUTPUT`, each process in the chain writes its own version.
+- **File versions:** Java writes a new version of a file each time it rewrites one, so
+  a local repository collects versions of `maven-metadata-local.xml`, checksums and
+  reinstalled artifacts. The launcher creates a missing local repository
+  (`SYS$LOGIN:[.m2.repository]`, or `-Dmaven.repo.local`) with a version limit of 1, so
+  a new version replaces the old. For a repository that already exists, or one named
+  only in `settings.xml`:
+
+  ```dcl
+  $ SET DIRECTORY/VERSION_LIMIT=1 SYS$LOGIN:[.m2.repository...]
+  $ SET FILE/VERSION_LIMIT=1 SYS$LOGIN:[.m2.repository...]*.*;
+  $ PURGE SYS$LOGIN:[.m2.repository...]
+  ```
+- **Run Maven without SYSPRV or BYPASS** if you can: a Maven run on an account with them
+  has twice deleted the JDK's `tools.jar` (cause not yet found; NOTES N17).
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL
   symbols or logical names. `MAVEN_VMS_TRACE` prints the Java command line.
 

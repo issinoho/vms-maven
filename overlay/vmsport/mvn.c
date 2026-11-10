@@ -30,6 +30,8 @@
    and JAVA$CREATE_DIR_WITH_OWNER_DELETE (unless defined), and makes the
    resolver lock files across processes (file-lock), since two builds
    sharing a local repository collide on OpenVMS's file locks otherwise.
+   A local repository that does not exist yet is created with a version
+   limit of 1, so files Maven rewrites there do not pile up versions.
 
    Environment variables are read with getenv(), so each may be a DCL symbol
    or a logical name.  MAVEN_VMS_TRACE (any value) prints the Java command.
@@ -366,6 +368,61 @@ map_sh (const char *home)
   setenv (name, concat ("/bin/sh=", join (home, "bin/mvnsh.exe")), 1);
 }
 
+/* The local repository: the last maven.repo.local given to Java or Maven
+   (-Dmaven.repo.local=X, or -D/--define maven.repo.local=X), else
+   ~/.m2/repository.  A <localRepository> in settings.xml is not seen here.  */
+static char *
+local_repository (void)
+{
+  static const char key[] = "maven.repo.local=";
+  const size_t klen = sizeof key - 1;
+  const char *found = NULL, *home;
+  int i;
+  for (i = 1; i < jargc; i++)
+    {
+      const char *a = jargv[i];
+      if (strncmp (a, "-D", 2) == 0 && strncmp (a + 2, key, klen) == 0)
+        found = a + 2 + klen;
+      else if ((strcmp (a, "-D") == 0 || strcmp (a, "--define") == 0)
+               && i + 1 < jargc && strncmp (jargv[i + 1], key, klen) == 0)
+        found = jargv[i + 1] + klen;
+    }
+  if (found != NULL && *found != '\0')
+    return unix_path (found);
+  home = getenv ("HOME");
+  return home != NULL ? join (unix_path (home), ".m2/repository") : NULL;
+}
+
+/* Create a missing local repository with a version limit of 1 (NOTES N19).
+   Java on OpenVMS writes a new version of a file each time it rewrites it,
+   so maven-metadata-local.xml, checksums and reinstalled artifacts pile up;
+   in a directory with limit 1, a new version replaces the old one, and the
+   directories Java creates below inherit the limit.  An existing repository
+   is left as it is (README.VMS says how to set the limit on one).  */
+static void
+make_repository (const char *repo)
+{
+  char *p, *s;
+  int code = JPI$_UIC;
+  unsigned int uic = 0;
+  if (repo == NULL || is_dir (repo))
+    return;
+  p = xstrdup (repo);
+  strip_trailing_slash (p);
+  for (s = strchr (p + 1, '/'); s != NULL; s = strchr (s + 1, '/'))
+    {
+      *s = '\0';
+      if (!is_dir (p))
+        mkdir (p, 0777);
+      *s = '/';
+    }
+  /* The DEC C mkdir's extra arguments: owner UIC, then the version limit.  */
+  if (!(lib$getjpi (&code, 0, 0, &uic, 0, 0) & 1))
+    uic = 0;
+  if (mkdir (p, 0777, uic, 1) != 0 && getenv ("MAVEN_VMS_TRACE") != NULL)
+    fprintf (stderr, "%s: cannot create %s: %s\n", prog, p, strerror (errno));
+}
+
 /* Java on OpenVMS wants far larger quotas than a default account has (HP's
    Java user guide: FILLM 4096, PGFLQUOTA 2097152), and a forked test JVM
    shares them with Maven's JVM (NOTES N12, N14).  Note low ones after a
@@ -432,6 +489,7 @@ main (int argc, char **argv)
   for (i = 1; i < argc; i++)
     add (argv[i]);
   jargv[jargc] = NULL;
+  make_repository (local_repository ());
 
   if (getenv ("MAVEN_VMS_TRACE") != NULL)
     {

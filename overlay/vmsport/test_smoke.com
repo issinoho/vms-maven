@@ -40,7 +40,7 @@ $!
 $ spec = home
 $ gosub to_unix
 $ uhome = uspec
-$ if f$parse(repo + "X.X") .eqs. "" then create/directory 'repo'
+$ if f$parse(repo + "X.X") .eqs. "" then create/directory/version_limit=1 'repo'
 $ spec = repo
 $ gosub to_unix
 $ urepo = uspec

@@ -38,7 +38,27 @@ $ i = i + 1
 $ goto up_loop
 $ up_done:
 $ repo = f$parse(home,,,"device") + repo + ".REPO]"
-$ if f$parse(repo + "X.X") .eqs. "" then create/directory 'repo'
+$! The repository has a version limit of 1, as MVN.EXE gives a new one (NOTES N19);
+$! this test's own artifacts go, so the version counts see only this run.
+$ if f$parse(repo + "X.X") .eqs. "" then create/directory/version_limit=1 'repo'
+$ rdirs = repo - "]" + "...]"
+$ set directory/version_limit=1 'rdirs'
+$ g = repo - "]" + ".com.example.multi"
+$ gdir = repo - "]" + ".com.example]multi.dir"
+$ if f$search(gdir) .nes. ""
+$ then
+$   set file/protection=(o:rwed) 'gdir','g'...]*.dir;*
+$   i = 0
+$ gdel_loop:
+$   define/user sys$output nl:
+$   define/user sys$error nl:
+$   delete/nolog 'g'...]*.*;*
+$   i = i + 1
+$   if i .lt. 8 .and. f$search(g + "...]*.*") .nes. "" then goto gdel_loop
+$   define/user sys$output nl:
+$   define/user sys$error nl:
+$   delete/nolog 'gdir';*
+$ endif
 $ spec = repo
 $ gosub to_unix
 $ urepo = uspec
@@ -93,7 +113,6 @@ $ if .not. found then gosub fail
 $!
 $! 3. The artifacts are in the local repository.
 $ t = "installed artifacts in the local repository"
-$ g = repo - "]" + ".com.example.multi"
 $ ok1 = f$search(g + ".core.1^.0]core-1^.0.jar") .nes. "" .and. -
         f$search(g + ".core.1^.0]core-1^.0-sources.jar") .nes. "" .and. -
         f$search(g + ".app.1^.0]app-1^.0.jar") .nes. "" .and. -
@@ -115,9 +134,16 @@ $ if vf .eqs. "" then goto v_done
 $ cnt = cnt + 1
 $ goto v_loop
 $ v_done:
-$ write sys$output "     versions of core-1.0.jar: ''cnt'"
-$ if st .and. cnt .eq. 1 then gosub pass
-$ if .not. (st .and. cnt .eq. 1) then gosub fail
+$ mcnt = 0
+$ m_loop:
+$ vf = f$search(g + ".core]maven-metadata-local.xml;*", 5)
+$ if vf .eqs. "" then goto m_done
+$ mcnt = mcnt + 1
+$ goto m_loop
+$ m_done:
+$ write sys$output "     versions of core-1.0.jar: ''cnt', of maven-metadata-local.xml: ''mcnt'"
+$ if st .and. cnt .eq. 1 .and. mcnt .eq. 1 then gosub pass
+$ if .not. (st .and. cnt .eq. 1 .and. mcnt .eq. 1) then gosub fail
 $!
 $! 5. Deploy to a file repository.
 $ t = "deploy to a file:// repository"
@@ -168,7 +194,7 @@ $ concurrent:
 $   t = "two builds at once, one empty repository (''conc_mode')"
 $   cm = conc_mode - "-"
 $   cr = work - "]" + ".repo_" + cm + "]"
-$   create/directory 'cr'
+$!  Not created here: MVN.EXE creates it (with a version limit of 1).
 $   spec = cr
 $   gosub to_unix
 $   ucr = uspec

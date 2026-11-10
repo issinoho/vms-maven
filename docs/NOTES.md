@@ -185,3 +185,20 @@ Closed", 0 tests run. The dump showed the forked JVM's binary event frames with 
 as if the pipe treated LF as a record end. IA64 (V8.0-502A) was fine. After OPENJDK80
 was reinstalled as V8.0-502A and OPENJDK17 removed, the same test passed; which change
 fixed it is unknown. README.VMS should ask for V8.0-502A or later.
+
+## N19. File versions in the local repository: a version limit of 1 (2026-11-10)
+
+N15's JAVA$DELETE_ALL_VERSIONS covers deletes, not rewrites: Java opening an existing
+file for output creates a new version (FileOutputStream and NIO Files.write alike), and
+so does a rename over an existing file. After the project tests the repository had
+maven-metadata-local.xml;2-;8, .jar.sha1 files up to ;6, and ;2 of reinstalled jars and
+poms. VSI's JVM reads JAVA$FILE_OPEN_MODE, but no value 0-4 changed this. A directory
+created with /VERSION_LIMIT=1 does: in a probe, files rewritten three times (classic and
+NIO) and a file replaced by temp + ATOMIC_MOVE each kept one version, and directories
+Java created below it (File.mkdirs, Files.createDirectories) inherited the limit.
+MVN.EXE now creates a missing local repository (the last maven.repo.local in Java's
+options or Maven's arguments, else ~/.m2/repository) with the DEC C mkdir's version
+limit argument; README.VMS gives the commands for an existing one. The project tests
+count versions of core-1.0.jar and maven-metadata-local.xml after a second install. An existing tree takes
+`SET DIRECTORY/VERSION_LIMIT=1 DEV:[REPO...]` (not `[REPO...]*.DIR`: "%SET-F-SYNTAX"),
+and files already there keep "No version limit" until SET FILE/VERSION_LIMIT=1.
