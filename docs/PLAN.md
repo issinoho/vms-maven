@@ -45,7 +45,7 @@ twice deleted the JDK's tools.jar, cause unknown, delete alarms set). Projects 8
 x86-64; 7/8 on IA64, where the version count saw core-1.0.jar versions from before N15.
 Later: MVN.EXE creates the local repository with a version limit of 1 (N19); the tests
 count jar and metadata versions from a clean start: x86-64 projects 8/8, smoke 8/8.
-IA64 not rebuilt: its VSI C licence is not active (%LICENSE-E-NOAUTH).
+IA64, after its VSI C licence was restored: build clean, smoke 8/8, projects 8/8.
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file
