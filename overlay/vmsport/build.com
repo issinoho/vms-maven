@@ -25,8 +25,17 @@ $!
 $! ---- CLEAN -------------------------------------------------------------------
 $ if target .eqs. "CLEAN"
 $ then
-$   if f$search("[.vmsport.pristine]*.jar") .nes. "" then -
-       copy/nolog [.vmsport.pristine]*.jar;0 [.lib]*.*
+$!  /REPLACE: a wildcard output keeps the input's version (;1), and [.LIB]
+$!  already has a ;1, so a plain COPY is "not superseded" and copies nothing.
+$   if f$search("[.vmsport.pristine]*.jar") .nes. ""
+$   then
+$     copy/nolog/replace [.vmsport.pristine]*.jar;0 [.lib]*.*
+$     if .not. $status
+$     then
+$       write sys$output "%BUILD-E-COPY, the upstream jars were not put back"
+$       errors = errors + 1
+$     endif
+$   endif
 $   purge/nolog [.lib]*.jar
 $   if f$search("[.bin]mvn.exe") .nes. "" then delete/nolog [.bin]mvn.exe;*
 $   if f$search("[.bin]mvnsh.exe") .nes. "" then delete/nolog [.bin]mvnsh.exe;*

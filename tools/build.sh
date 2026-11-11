@@ -22,7 +22,7 @@ cat > "$job" <<DCL
 DCL
 VMS_TIMEOUT=${VMS_BUILD_TIMEOUT:-1800} "$top/tools/vms.sh" "$node" run "$job" | tee "$top/out/build-$node.log"
 grep -aq 'BUILD: done' "$top/out/build-$node.log"
-if grep -aE 'USEUNDEF|UNDFSYM|%DCL-[WEF]-|%CC-[EF]-|%I?LINK-[EF]-|BUILD-E-| error: |^[0-9]+ errors?$' \
+if grep -aE 'USEUNDEF|UNDFSYM|%DCL-[WEF]-|%COPY-[EWF]-|%CC-[EF]-|%I?LINK-[EF]-|BUILD-E-| error: |^[0-9]+ errors?$' \
         "$top/out/build-$node.log" >&2; then
     echo "build: errors in out/build-$node.log" >&2
     exit 1
