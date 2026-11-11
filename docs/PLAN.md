@@ -54,6 +54,10 @@ Status 2026-11-11: the resolver's DELETE_ON_CLOSE lock files made VSI Java delet
 jars Maven had open at exit (plugin jars every run; tools.jar under SYSPRV); MVN.EXE now
 keeps the lock files (N21). x86-64: smoke 8/8, projects 8/8, plugins 3+2 known; IA64:
 projects 8/8, plugins 3+2 known.
+Status 2026-11-11: TEST_CONFIG.COM (N22): ~/.m2 and conf/ settings and toolchains, the
+default repository in user.home, -s; 5/5 on both nodes with patch 0004 (a JDK
+toolchain finds JAVAC.EXE). All four suites pass on both nodes; one x86-64 plugins run
+hung for 35 minutes after BUILD SUCCESS, at JVM exit (to be watched).
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file
@@ -61,7 +65,7 @@ projects 8/8, plugins 3+2 known.
   assembly, javadoc).
 - Two Maven processes sharing one local repository (resolver's file locks, N2).
 - Default local repository in SYS$LOGIN:[.m2]; settings.xml and toolchains.xml in
-  ~/.m2 and conf/.
+  ~/.m2 and conf/. Done (N22).
 - Interactive use from a terminal: output, colour off, CTRL/C and CTRL/Y.
 - 3.10.0's terminal output (N3).
 - Record failures in NOTES; patch what is Maven's, document what is a plugin's.

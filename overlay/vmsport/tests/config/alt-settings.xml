@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TEST_CONFIG.COM: given with -s, in place of the user settings. -->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <profiles>
+    <profile>
+      <id>cfgalt</id>
+      <properties><cfg.user>from-s-option</cfg.user></properties>
+    </profile>
+  </profiles>
+  <activeProfiles><activeProfile>cfgalt</activeProfile></activeProfiles>
+</settings>

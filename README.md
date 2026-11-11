@@ -66,6 +66,11 @@ $ PIPE MVN -B package > build.log
   with their lock files kept in `.locks`: VSI Java's handling of the resolver's
   delete-on-close lock files deleted the jars Maven had open, plugin jars and, with
   SYSPRV, the JDK's `tools.jar` (NOTES N21).
+- **Settings and toolchains:** `conf/settings.xml` and `conf/toolchains.xml` in the Maven
+  tree, and `settings.xml`, `toolchains.xml` and `repository` in `SYS$LOGIN:[.m2]` (Java's
+  user.home), as on other systems. Give file options such as `-s` and `-f` Unix paths
+  (`-s /DISK$USER/USERNAME/alt.xml`). A JDK toolchain's `jdkHome` is the JDK's directory
+  as a Unix path, e.g. `/SYS$COMMON/openjdk$80` (NOTES N22).
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL
   symbols or logical names. `MAVEN_VMS_TRACE` prints the Java command line.
 
@@ -76,13 +81,15 @@ $ PIPE MVN -B package > build.log
 | 0001 | resolver: close a tracking file before deleting it | OpenVMS cannot delete an open file; every download failed (NOTES N2) |
 | 0002 | conf/settings.xml: small argLine for forked tests on OpenVMS | the forked JVM shares Maven's pooled quotas (N12) |
 | 0003 | conf/settings.xml: javadoc tool and POSIX tar on OpenVMS | the plugin finds no `bin/javadoc`; a UIC is too big for the old tar header (N20) |
+| 0004 | maven-core: a JDK toolchain finds `<tool>.exe` on OpenVMS | it found no `bin/javac`, so the compiler used the bare `javac`, not the toolchain's (N22) |
 
 ## Building
 
 ```sh
 tools/prepare.sh                 # fetch + verify, unpack, patch -> staging/
 tools/build.sh <ia64|x86>        # MVN.EXE and the patched jars, on the node
-tools/test.sh <node>             # smoke test (batch job, uses Maven Central)
+tools/test.sh <node> [suite]     # batch job, uses Maven Central: smoke (default),
+                                 # projects, plugins, config
 ```
 
 `tools/nodes.conf` (from `nodes.conf.example`) names the nodes. Builds need VSI C and VSI

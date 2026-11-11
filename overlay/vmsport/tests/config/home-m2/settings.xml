@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TEST_CONFIG.COM copies this into its test home as .m2/settings.xml. -->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <profiles>
+    <profile>
+      <id>cfgtest</id>
+      <properties><cfg.user>from-user-settings</cfg.user></properties>
+    </profile>
+  </profiles>
+  <activeProfiles><activeProfile>cfgtest</activeProfile></activeProfiles>
+</settings>

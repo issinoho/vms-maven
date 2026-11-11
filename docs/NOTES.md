@@ -272,3 +272,30 @@ MVN.EXE keeps the cross-process file locks (N16) but passes
 -Daether.named.file-lock.deleteLockFiles=false: the lock files stay in .locks as empty
 files. A resolver patch that skipped deleting a temp file's name after moving it was
 tried first and did not help.
+
+## N22. settings.xml, toolchains.xml and the default local repository (2026-11-11)
+
+`mvn -X` on x86-64: Maven reads `conf/settings.xml` and `conf/toolchains.xml` from its
+home, and `~/.m2/settings.xml`, `~/.m2/toolchains.xml` and `~/.m2/repository`, where `~`
+is user.home: SYS$LOGIN as a Unix path (`/DISK$USER/USERNAME/.m2/...`). TEST_CONFIG.COM
+(tests/config) checks them in a test home given as user.home, not the account's own:
+
+- **Default local repository:** `<user.home>/.m2/repository`. MVN.EXE creates it with a
+  version limit of 1 (N19); it now takes user.home from the last `-Duser.home`, as
+  Maven does, before HOME.
+- **user.home and toolchains:** Maven reads the user toolchains path from user.home when
+  it starts, so `-Duser.home` among Maven's arguments changes the settings and the
+  repository but not `toolchains.xml`; given to the JVM (MAVEN_OPTS) it changes all.
+  The same on every platform.
+- **settings:** a profile in `~/.m2/settings.xml`, conf/settings.xml's openvms profile,
+  and `-s <unix path>` all work. `-s [-.x]settings.xml` worked too, by accident: Maven
+  puts the current directory in front (`/dev/dir/[-.x]settings.xml`, as -X shows), and
+  the C RTL still resolves that. Give Unix paths.
+- **JDK toolchain:** maven-toolchains-plugin found the toolchain, but
+  `JavaToolchainImpl.findTool` (maven-core) adds ".exe" only on Windows, so it found no
+  `bin/javac` and maven-compiler-plugin warned "Unable to autodetect 'javac' path,
+  using 'javac' from the environment": the bare name, which MVN.EXE maps to the javac
+  of the JDK Maven runs on (N20). With one JDK no harm; with a toolchain for another,
+  the wrong compiler. Patch 0004 looks for `<tool>.exe` on OpenVMS too.
+- DCL: without privileges F$PARSE gives "" for a directory it cannot look into (the
+  JDK in [SYS0.SYSCOMMON]); SYNTAX_ONLY gives the parts.

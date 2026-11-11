@@ -31,7 +31,7 @@ settled and found.
 ```sh
 tools/prepare.sh                 # always first after changing patches/ or overlay/
 tools/build.sh <ia64|x86> [ALL|CLEAN]   # MVN.EXE + patched jars
-tools/test.sh <node>             # smoke test (batch job; needs Maven Central)
+tools/test.sh <node> [suite]     # smoke|projects|plugins|config (batch job; Maven Central)
 tools/vms.sh <node> dcl '<cmd>'  # run DCL; also run/batch/put/get
 ```
 

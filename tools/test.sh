@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# test.sh <node> [smoke|projects|plugins] - run a test procedure as a batch job on <node> against
+# test.sh <node> [smoke|projects|plugins|config] - run a test procedure as a batch job on <node> against
 # the built tree (build.sh first):
 #   smoke     [.VMSPORT]TEST_SMOKE.COM: the launcher and a one-module build (default)
 #   projects  [.VMSPORT]TEST_PROJECTS.COM: a reactor, shade, install, deploy, clean, and
 #             two builds at once into an empty repository
 #   plugins   [.VMSPORT]TEST_PLUGINS.COM: exec:java, exec:exec, antrun, javadoc, assembly
-# Both use Maven Central (the shared repository is <workdir>[.REPO]).
+#   config    [.VMSPORT]TEST_CONFIG.COM: settings.xml, toolchains.xml, the default
+#             local repository (in a test home, not the account's own)
+# All use Maven Central (the shared repository is <workdir>[.REPO]).
 # Output is saved to out/<suite>-<node>.log; exit status 0 only if all tests pass.
 set -euo pipefail
 
 top=$(cd "$(dirname "$0")/.." && pwd)
-node=${1:?usage: test.sh <node> [smoke|projects|plugins]}
+node=${1:?usage: test.sh <node> [smoke|projects|plugins|config]}
 suite=${2:-smoke}
 case $suite in
     smoke) com=TEST_SMOKE.COM tag=SMOKE ;;
     projects) com=TEST_PROJECTS.COM tag=PROJECTS ;;
     plugins) com=TEST_PLUGINS.COM tag=PLUGINS ;;
+    config) com=TEST_CONFIG.COM tag=CONFIG ;;
     *) echo "test.sh: unknown suite '$suite'" >&2; exit 2 ;;
 esac
 . "$top/upstream.conf"
