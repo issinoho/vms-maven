@@ -1,0 +1,28 @@
+Subject: maven-core: on OpenVMS, a JDK toolchain finds <tool>.exe
+
+JavaToolchainImpl.findTool() looks for jdkHome/bin/<tool>, adding ".exe"
+only on Windows. On OpenVMS the JDK's programs are images too (JAVAC.EXE,
+JAVA.EXE), so findTool("javac") returned null for every JDK toolchain:
+maven-compiler-plugin warned "Unable to autodetect 'javac' path, using
+'javac' from the environment" and compiled with whatever "javac" means
+there (on our nodes the JDK Maven runs on), not the toolchain's JDK.
+
+Look for <tool>.exe on OpenVMS as on Windows (plexus-utils' Os family
+"openvms"); other systems keep the upstream behaviour.
+
+Fits upstream (apache/maven, maven-core) as an Os family check; to be
+offered there.
+
+--- a/vmsport/src/maven-core/org/apache/maven/toolchain/java/JavaToolchainImpl.java	2026-11-11 21:07:24.967589926 +0000
++++ b/vmsport/src/maven-core/org/apache/maven/toolchain/java/JavaToolchainImpl.java	2026-11-11 21:07:25.030447276 +0000
+@@ -65,7 +65,9 @@
+         File bin = new File(installDir, "bin"); // NOI18N
+         if (bin.exists()) {
+             boolean isWindows = Os.isFamily("windows"); // NOI18N
+-            if (isWindows) {
++            // OpenVMS images are <tool>.EXE too (java.home/bin/java.exe).
++            boolean isOpenVms = Os.isFamily("openvms"); // NOI18N
++            if (isWindows || isOpenVms) {
+                 File tool = new File(bin, toolName + ".exe");
+                 if (tool.exists()) {
+                     return tool;

@@ -1,3 +1,4 @@
 0001-resolver-tracking-file-delete-after-close.patch
 0002-settings-openvms-argline.patch
 0003-settings-openvms-javadoc-tar.patch
+0004-core-toolchain-openvms-exe.patch
