@@ -62,8 +62,10 @@ $ PIPE MVN -B package > build.log
   $ SET FILE/VERSION_LIMIT=1 SYS$LOGIN:[.m2.repository...]*.*;
   $ PURGE SYS$LOGIN:[.m2.repository...]
   ```
-- **Run Maven without SYSPRV or BYPASS** if you can: a Maven run on an account with them
-  has twice deleted the JDK's `tools.jar` (cause not yet found; NOTES N17).
+- The resolver's cross-process file locks are on (two builds can share a repository),
+  with their lock files kept in `.locks`: VSI Java's handling of the resolver's
+  delete-on-close lock files deleted the jars Maven had open, plugin jars and, with
+  SYSPRV, the JDK's `tools.jar` (NOTES N21).
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL
   symbols or logical names. `MAVEN_VMS_TRACE` prints the Java command line.
 

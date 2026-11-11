@@ -50,6 +50,10 @@ Status 2026-11-11: TEST_PLUGINS.COM (exec:java, exec:exec, antrun, javadoc, asse
 3 passed, 2 known on both nodes (N20): MVN.EXE maps java/javac/javadoc/jar, patch
 0003 sets the javadoc tool and POSIX tar; exec:exec (commons-exec) and antrun's
 argument quoting (Ant) are upstream bugs, to be offered there.
+Status 2026-11-11: the resolver's DELETE_ON_CLOSE lock files made VSI Java delete the
+jars Maven had open at exit (plugin jars every run; tools.jar under SYSPRV); MVN.EXE now
+keeps the lock files (N21). x86-64: smoke 8/8, projects 8/8, plugins 3+2 known; IA64:
+projects 8/8, plugins 3+2 known.
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file

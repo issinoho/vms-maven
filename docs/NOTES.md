@@ -142,6 +142,8 @@ defaults (a user's -D overrides them).
 
 ## N17. tools.jar disappeared from the IA64 JDK (2026-11-06, 22:16-22:21)
 
+**Cause found: N21** (the file-lock factory's DELETE_ON_CLOSE; fixed in MVN.EXE).
+
 `javac` and Maven's compiler stopped working: "Could not find or load main class
 com.sun.tools.javac.Main". SYS$COMMON:[openjdk$80.lib]tools.jar, which PCSI lists for
 OPENJDK80, is gone; the last compile that used it finished at 22:16:27 (the concurrent
@@ -238,3 +240,35 @@ TEST_PLUGINS.COM (tests/plugins) on x86-64, first run: exec:java (in Maven's JVM
   ( > 2097151 )": the owner's UIC as one number does not fit the old tar header. The
   zip was fine. Patch 0003 sets assembly.tarLongFileMode=posix, with which
   plexus-archiver writes big ids (and long names) in pax headers.
+
+## N21. The file-lock factory's DELETE_ON_CLOSE deleted Maven's open jars (2026-11-11)
+
+The cause of N17. After a build, the local repository had the .pom, .sha1 and
+_remote.repositories of every plugin and plugin dependency, but not the jar, so every
+build downloaded them again (and failed when Maven Central was unreachable: the IA64
+smoke test of 2026-11-11). Found with:
+
+- an AUDIT=SECURITY ACE with OPTIONS=DEFAULT on a fresh repository (ALARM ACEs only go
+  to OPCOM, and this system's OPERATOR.LOG is not written, so the "no records" of the
+  first alarm runs, and of N17's tools.jar alarms, meant nothing): Maven's own java.exe
+  deleted every jar of the plugins' class realms one after another, about 10 ms apart,
+  as the JVM exited (Object deletion, by file ID, the jar's own);
+- a SecurityManager on the boot classpath logging every checkDelete with its stack:
+  no Java code asked to delete a jar (only temp files, .lastUpdated and lock files);
+- builds into fresh repositories: with -Daether.named.file-lock.deleteLockFiles=false
+  or with the rwlock-local factory, every jar survived; with the defaults, none did.
+
+The resolver's file-lock factory opens each lock file with DELETE_ON_CLOSE. VSI's JVM
+emulates that (its share layer has a delete_on_close), and in Maven's pattern of use
+the delete lands on another file the JVM has open: the jars, deleted when the JVM
+closes them at exit. Simple sequences (a DELETE_ON_CLOSE channel, then a jar opened and
+left open; moves and deletes of temp files with streams open; class loaders, ZipFile,
+JarFile and jar: URLs) did not reproduce it alone; to be reported to VSI with the
+Maven case. tools.jar, loaded by in-process javac, went the same way while the account
+held SYSPRV (the system protection category gives delete); the losses began with the
+first file-lock runs (N16).
+
+MVN.EXE keeps the cross-process file locks (N16) but passes
+-Daether.named.file-lock.deleteLockFiles=false: the lock files stay in .locks as empty
+files. A resolver patch that skipped deleting a temp file's name after moving it was
+tried first and did not help.

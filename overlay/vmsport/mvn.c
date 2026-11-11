@@ -31,6 +31,9 @@
    and JAVA$CREATE_DIR_WITH_OWNER_DELETE (unless defined), and makes the
    resolver lock files across processes (file-lock), since two builds
    sharing a local repository collide on OpenVMS's file locks otherwise.
+   The lock files are kept (deleteLockFiles=false): opened with
+   DELETE_ON_CLOSE, as the resolver does by default, they made VSI Java
+   delete the jars Maven's JVM had open when it exited (NOTES N21).
    A local repository that does not exist yet is created with a version
    limit of 1, so files Maven rewrites there do not pile up versions.
 
@@ -62,7 +65,8 @@
 #define DEFAULT_JVM_OPTS \
   "-Xms16m -Xmx128m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=32m " \
   "-Daether.syncContext.named.factory=file-lock " \
-  "-Daether.syncContext.named.nameMapper=file-gav"
+  "-Daether.syncContext.named.nameMapper=file-gav " \
+  "-Daether.named.file-lock.deleteLockFiles=false"
 
 static const char *prog = "mvn";
 static char *jargv[MAXARGS];
