@@ -24,7 +24,8 @@
    /bin/sh -c "cd DIR && PROGRAM ARGS".  VSI's JVM maps a program it starts
    through the logical names or variables JAVA$EXEC_MAPPING_01, _02, ...
    ("/bin/sh=<image>"); the launcher adds one for /bin/sh that points at
-   MVNSH.EXE next to it (mvnsh.c), unless one already maps /bin/sh.
+   MVNSH.EXE next to it (mvnsh.c), and maps the bare names java, javac,
+   javadoc and jar to the JDK's images, unless the site already maps them.
 
    It also sets VSI Java's JAVA$DELETE_ALL_VERSIONS, JAVA$RENAME_ALL_VERSIONS
    and JAVA$CREATE_DIR_WITH_OWNER_DELETE (unless defined), and makes the
@@ -347,25 +348,55 @@ java_file_settings (void)
       setenv (names[i], "TRUE", 1);
 }
 
-/* Map /bin/sh to MVNSH.EXE for Java (see the top of this file).  */
+/* Map program NAME to IMAGE for the programs Java starts, through the
+   first free JAVA$EXEC_MAPPING_nn, unless one already maps NAME (the
+   site's own mapping wins).  */
 static void
-map_sh (const char *home)
+map_program (const char *name, const char *image)
 {
-  char name[32];
+  char var[32], *prefix = concat (name, "=");
+  size_t plen = strlen (prefix);
   int i;
   for (i = 1; i <= 99; i++)
     {
       const char *v;
-      sprintf (name, "JAVA$EXEC_MAPPING_%02d", i);
-      v = getenv (name);
+      sprintf (var, "JAVA$EXEC_MAPPING_%02d", i);
+      v = getenv (var);
       if (v == NULL)
         break;
-      if (strncmp (v, "/bin/sh=", 8) == 0)
-        return;                         /* the site's own mapping */
+      if (strncmp (v, prefix, plen) == 0)
+        return;
     }
-  if (i > 99)
+  if (i <= 99)
+    setenv (var, concat (prefix, image), 1);
+}
+
+/* Map /bin/sh to MVNSH.EXE (see the top of this file), and the bare names
+   of the JDK's tools to their images (NOTES N20): Ant, for one, starts
+   "java" when it finds no java.home/bin/java, which on OpenVMS is JAVA.EXE.  */
+static void
+map_programs (const char *home, const char *java)
+{
+  static const char *tools[] = { "javac", "javadoc", "jar" };
+  char *jbin = unix_path (java), *jdkbin, *s;
+  size_t i, n;
+  map_program ("/bin/sh", join (home, "bin/mvnsh.exe"));
+  map_program ("java", jbin);
+  /* The JDK's bin: <jdk>/jre/bin/java -> <jdk>/bin (Java 8), else beside java.  */
+  s = strrchr (jbin, '/');
+  if (s == NULL)
     return;
-  setenv (name, concat ("/bin/sh=", join (home, "bin/mvnsh.exe")), 1);
+  jdkbin = xstrdup (jbin);
+  jdkbin[s - jbin] = '\0';
+  n = strlen (jdkbin);
+  if (n > 8 && strcasecmp (jdkbin + n - 8, "/jre/bin") == 0)
+    strcpy (jdkbin + n - 8, "/bin");
+  for (i = 0; i < sizeof tools / sizeof tools[0]; i++)
+    {
+      char *image = join (jdkbin, concat (tools[i], ".exe"));
+      if (is_file (image))
+        map_program (tools[i], image);
+    }
 }
 
 /* The local repository: the last maven.repo.local given to Java or Maven
@@ -466,7 +497,7 @@ main (int argc, char **argv)
   home = maven_home ();
   java = java_image ();
   basedir = find_basedir (argc, argv);
-  map_sh (home);
+  map_programs (home, java);
   java_file_settings ();
 
   add ("java");

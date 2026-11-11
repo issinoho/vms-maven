@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Plugin test project for vms-maven (TEST_PLUGINS.COM): plugins that run programs
+     (exec:java in Maven's JVM, exec:exec and antrun's <java fork> in new ones) and
+     plugins that write many files (javadoc, assembly zip and tar.gz). Each is an
+     execution with an id, so the test runs them one at a time (goal@id). -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example.plugins</groupId>
+  <artifactId>plugins</artifactId>
+  <version>1.0</version>
+  <properties>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency><groupId>org.apache.commons</groupId><artifactId>commons-lang3</artifactId><version>3.17.0</version></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <!-- In Maven's JVM: write 300 files into target/gen. -->
+          <execution>
+            <id>gen</id>
+            <goals><goal>java</goal></goals>
+            <configuration>
+              <mainClass>com.example.plugins.Tool</mainClass>
+              <arguments><argument>gen</argument><argument>${project.build.directory}/gen</argument><argument>300</argument></arguments>
+            </configuration>
+          </execution>
+          <!-- A new JVM, in target/, with the project's classpath. -->
+          <execution>
+            <id>fork</id>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>${java.home}/bin/java</executable>
+              <workingDirectory>${project.build.directory}</workingDirectory>
+              <arguments>
+                <argument>-Xmx32m</argument>
+                <argument>-classpath</argument><classpath/>
+                <argument>com.example.plugins.Tool</argument>
+                <argument>forked</argument><argument>MixedCase Arg</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>ant</id>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}/ant"/>
+                <echo file="${project.build.directory}/ant/echo.txt" message="ant echo"/>
+                <copy todir="${project.build.directory}/ant/copy"><fileset dir="src/main/resources"/></copy>
+                <delete file="${project.build.directory}/ant/echo.txt"/>
+                <java classname="com.example.plugins.Tool" classpathref="maven.compile.classpath"
+                      fork="true" failonerror="true" maxmemory="32m">
+                  <arg value="ant"/><arg value="MixedCase Arg"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>3.11.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.7.1</version>
+        <executions>
+          <execution>
+            <id>dist</id>
+            <goals><goal>single</goal></goals>
+            <configuration><descriptors><descriptor>src/assembly/dist.xml</descriptor></descriptors></configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

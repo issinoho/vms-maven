@@ -1,0 +1,33 @@
+Subject: conf/settings.xml: on OpenVMS, the javadoc tool and tar's user ids
+
+Two plugins fail on OpenVMS with their defaults (NOTES N20):
+
+- maven-javadoc-plugin looks for ${java.home}/../bin/javadoc and, not
+  finding it (the file is JAVADOC.EXE), stops with "Unable to find javadoc
+  command". Its javadocExecutable property names the image.
+- maven-assembly-plugin's tar archives (plexus-archiver) failed with
+  "user id '8388673' is too big ( > 2097151 )": the file owner's UIC
+  ([group,member] as one number) does not fit the old tar header. With
+  assembly.tarLongFileMode=posix, plexus-archiver writes big ids, and long
+  names, in pax headers, which every current tar reads.
+
+Both are properties in the openvms profile, so a project's own
+configuration still wins. Nothing changes on other systems.
+
+VMS-only, not for upstream.
+
+--- a/conf/settings.xml	2026-11-11 07:25:08.350317114 +0000
++++ b/conf/settings.xml	2026-11-11 07:25:08.368642632 +0000
+@@ -268,6 +268,12 @@
+       </activation>
+       <properties>
+         <argLine>-Xms8m -Xmx64m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=16m</argLine>
++        <!-- The javadoc tool: the plugin looks for bin/javadoc, which is
++             JAVADOC.EXE here (vms-maven, NOTES N20). -->
++        <javadocExecutable>${java.home}/../bin/javadoc.exe</javadocExecutable>
++        <!-- tar archives: an OpenVMS UIC as a tar user id is too big for the
++             old format; posix writes it, and long names, in pax headers. -->
++        <assembly.tarLongFileMode>posix</assembly.tarLongFileMode>
+       </properties>
+     </profile>
+   </profiles>

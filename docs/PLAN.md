@@ -46,6 +46,10 @@ x86-64; 7/8 on IA64, where the version count saw core-1.0.jar versions from befo
 Later: MVN.EXE creates the local repository with a version limit of 1 (N19); the tests
 count jar and metadata versions from a clean start: x86-64 projects 8/8, smoke 8/8.
 IA64, after its VSI C licence was restored: build clean, smoke 8/8, projects 8/8.
+Status 2026-11-11: TEST_PLUGINS.COM (exec:java, exec:exec, antrun, javadoc, assembly):
+3 passed, 2 known on both nodes (N20): MVN.EXE maps java/javac/javadoc/jar, patch
+0003 sets the javadoc tool and POSIX tar; exec:exec (commons-exec) and antrun's
+argument quoting (Ant) are upstream bugs, to be offered there.
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
 - Multi-module reactor builds; `install` into the local repository; `deploy` to a file

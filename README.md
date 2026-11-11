@@ -43,6 +43,13 @@ $ PIPE MVN -B package > build.log
   `.mvn/jvm.config` override them.
 - To keep a build's output in a file, use `PIPE MVN ... > file`: with
   `DEFINE/USER SYS$OUTPUT`, each process in the chain writes its own version.
+- **Plugins that run programs:** the launcher also maps the bare names `java`, `javac`,
+  `javadoc` and `jar` to the JDK's images, since Ant (antrun) and others start `java`
+  when they find no `bin/java` (it is `JAVA.EXE`). The `openvms` profile in
+  `conf/settings.xml` points the javadoc plugin at `JAVADOC.EXE` and makes tar archives
+  POSIX, so an OpenVMS UIC fits as the owner. Known problems (NOTES N20):
+  `exec:exec` fails (a bug in commons-exec's OpenVMS launcher; use `exec:java`), and
+  antrun's `<java fork>` splits an argument that contains a space.
 - **File versions:** Java writes a new version of a file each time it rewrites one, so
   a local repository collects versions of `maven-metadata-local.xml`, checksums and
   reinstalled artifacts. The launcher creates a missing local repository
@@ -66,6 +73,7 @@ $ PIPE MVN -B package > build.log
 |---|---|---|
 | 0001 | resolver: close a tracking file before deleting it | OpenVMS cannot delete an open file; every download failed (NOTES N2) |
 | 0002 | conf/settings.xml: small argLine for forked tests on OpenVMS | the forked JVM shares Maven's pooled quotas (N12) |
+| 0003 | conf/settings.xml: javadoc tool and POSIX tar on OpenVMS | the plugin finds no `bin/javadoc`; a UIC is too big for the old tar header (N20) |
 
 ## Building
 

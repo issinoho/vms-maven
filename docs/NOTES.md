@@ -202,3 +202,39 @@ limit argument; README.VMS gives the commands for an existing one. The project t
 count versions of core-1.0.jar and maven-metadata-local.xml after a second install. An existing tree takes
 `SET DIRECTORY/VERSION_LIMIT=1 DEV:[REPO...]` (not `[REPO...]*.DIR`: "%SET-F-SYNTAX"),
 and files already there keep "No version limit" until SET FILE/VERSION_LIMIT=1.
+
+## N20. Plugins that run programs or write many files (2026-11-11)
+
+TEST_PLUGINS.COM (tests/plugins) on x86-64, first run: exec:java (in Maven's JVM,
+300 files) passed; four failed, each for its own reason:
+
+- **exec:exec** (exec-maven-plugin 3.5.0, commons-exec 1.4.0): commons-exec picks its
+  VmsCommandLauncher from os.name, which writes the command as a DCL procedure. It
+  writes each environment variable as `$ NAME == "` + newline + `VALUE"` (println
+  where print was meant), so DCL runs `VALUE"` as a command: "%DCL-W-NOCOMD",
+  "%DCL-E-PARSEFAIL, error parsing DCL$PATH:TRUE"". It also writes the program as a
+  Unix path after `$ `, which DCL cannot run, unless the file exists (then `@` it as a
+  procedure). Still so in commons-exec 1.6.0, the latest. No configuration avoids the
+  launcher; exec:java, or antrun's <java>/<exec>, work. To be offered upstream.
+- **antrun `<java fork="true">`** (Ant 1.10.12): JavaEnvUtils looks for
+  java.home/bin/java, adds ".exe" only on DOS, so on OpenVMS (JAVA.EXE) falls back to
+  "java", and ProcessBuilder fails: "Cannot run program "java" ... no such file or
+  directory". Ant starts it directly (Java13CommandLauncher, not its DCL launcher).
+  VSI's JAVA$EXEC_MAPPING_nn matches a bare program name too ("java=/.../java.exe"
+  made ProcessBuilder("java") run Java), so MVN.EXE now maps java, javac, javadoc
+  and jar to the JDK's images, as it maps /bin/sh (unless the site maps them).
+  With that, <java fork> runs. On OpenVMS Ant always uses its shell launcher for it
+  (Execute turns the VM launcher off for the os family "openvms"): VmsCommandLauncher
+  writes `$ java -` and each argument unquoted on its own continuation line into an
+  ANT*.COM, so an argument with a space arrives as two ("MixedCase Arg" ->
+  "MixedCase", "Arg"); case was kept (the job has the EXTENDED parse style). The
+  JVM itself passes such arguments intact (ProcessBuilder by path, by a mapped bare
+  name, and through MVNSH, in either parse style). Known; a quoting fix for Ant's
+  VmsCommandLauncher to be offered upstream.
+- **javadoc:jar** (maven-javadoc-plugin 3.11.2): looks for java.home/../bin/javadoc
+  (".exe" only on Windows): "Unable to find javadoc command". Patch 0003's openvms
+  settings profile sets javadocExecutable to ${java.home}/../bin/javadoc.exe.
+- **assembly tar.gz** (plexus-archiver 4.9.2): "user id '8388673' is too big
+  ( > 2097151 )": the owner's UIC as one number does not fit the old tar header. The
+  zip was fine. Patch 0003 sets assembly.tarLongFileMode=posix, with which
+  plexus-archiver writes big ids (and long names) in pax headers.
