@@ -299,3 +299,13 @@ is user.home: SYS$LOGIN as a Unix path (`/DISK$USER/USERNAME/.m2/...`). TEST_CON
   the wrong compiler. Patch 0004 looks for `<tool>.exe` on OpenVMS too.
 - DCL: without privileges F$PARSE gives "" for a directory it cannot look into (the
   JDK in [SYS0.SYSCOMMON]); SYNTAX_ONLY gives the parts.
+
+## N23. A JVM that did not exit after BUILD SUCCESS (x86-64, 2026-11-11, open)
+
+In one TEST_PLUGINS.COM run on x86-64, step 5 (`package assembly:single`, 5:55 min
+where it usually takes about 1) printed BUILD SUCCESS at 22:10:15, and its JVM then sat
+in LEF with no CPU or I/O for 35 minutes. jstack failed ("Premature EOF" from
+VmsVirtualMachine.execute), and the JVM exited 3 s after that attach: the attach seems
+to have woken it. The rerun took 8:40 in all and did not hang. Not seen on IA64. If it
+comes back, look at the process with SHOW PROCESS/ID and ANALYZE/SYSTEM before any
+attach, since the attach itself let it go.
