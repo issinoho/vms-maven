@@ -403,15 +403,13 @@ map_programs (const char *home, const char *java)
     }
 }
 
-/* The local repository: the last maven.repo.local given to Java or Maven
-   (-Dmaven.repo.local=X, or -D/--define maven.repo.local=X), else
-   ~/.m2/repository.  A <localRepository> in settings.xml is not seen here.  */
-static char *
-local_repository (void)
+/* The value of the last -DKEY=X (or -D/--define KEY=X) given to Java or
+   Maven, or NULL.  KEY ends in "=".  */
+static const char *
+last_define (const char *key)
 {
-  static const char key[] = "maven.repo.local=";
-  const size_t klen = sizeof key - 1;
-  const char *found = NULL, *home;
+  const size_t klen = strlen (key);
+  const char *found = NULL;
   int i;
   for (i = 1; i < jargc; i++)
     {
@@ -422,9 +420,22 @@ local_repository (void)
                && i + 1 < jargc && strncmp (jargv[i + 1], key, klen) == 0)
         found = jargv[i + 1] + klen;
     }
-  if (found != NULL && *found != '\0')
-    return unix_path (found);
-  home = getenv ("HOME");
+  return found != NULL && *found != '\0' ? found : NULL;
+}
+
+/* The local repository: the last maven.repo.local given, else
+   <user.home>/.m2/repository, where user.home is the last -Duser.home
+   given, else HOME, as Maven sees it.  A <localRepository> in settings.xml
+   is not seen here.  */
+static char *
+local_repository (void)
+{
+  const char *repo = last_define ("maven.repo.local="), *home;
+  if (repo != NULL)
+    return unix_path (repo);
+  home = last_define ("user.home=");
+  if (home == NULL)
+    home = getenv ("HOME");
   return home != NULL ? join (unix_path (home), ".m2/repository") : NULL;
 }
 
