@@ -1,7 +1,7 @@
 # Decisions
 
 D1-D3 agreed with the user 2026-11-06 ("3.9.16 first", product MAVEN, go ahead with
-Phase 1); D4-D6 proposed.
+Phase 1); D4-D6 agreed 2026-11-21, for the first release.
 
 ## D1. Maven 3.9 first, on the nodes' Java 8
 
@@ -23,14 +23,14 @@ back into that jar. Patches are written to go upstream.
 There is no VSI Maven kit, so the PCSI product is ISSINOHO MAVEN with the concealed rooted
 logical MAVEN$ROOT (layout in Phase 4). Kit: ISSINOHO-<I64VMS|X86VMS>-MAVEN-...-1.PCSI.
 
-## D4. The launcher is a C image (proposed)
+## D4. The launcher is a C image
 
 `MVN` is a foreign command for `MAVEN$ROOT:[BIN]MVN.EXE`, a C port of `bin/mvn`
 (overlay/vmsport/mvn.c), because a DCL procedure gets its parameters upper-cased and at
 most eight of them (N4). It starts Java with vfork/execv, so arguments reach Java without
 DCL in between (N5), and returns Java's exit status.
 
-## D5. Forked tests through our own /bin/sh, with small JVMs (proposed)
+## D5. Forked tests through our own /bin/sh, with small JVMs
 
 surefire forks its test JVM through `/bin/sh` (N6). Running tests in Maven's JVM
 (`forkCount=0`) avoids that but changes behaviour: tests run in the reactor root, not
@@ -40,7 +40,7 @@ job's pooled quotas, MVN.EXE gives Maven's JVM small-footprint defaults and patc
 `openvms` settings profile gives forked JVMs a small argLine; both are overridden by the
 user's own options. README.VMS asks for Java's recommended quotas (N14).
 
-## D6. Versions and tags (proposed)
+## D6. Versions and tags
 
 Tags v<upstream>-vms<N> (v3.9.16-vms1). PCSI version V3.9-16E<N>, as vms-vim's
 three-part versions.
