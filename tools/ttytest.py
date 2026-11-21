@@ -8,9 +8,10 @@ subprocesses:
   version     mvn -v
   build       a build's output; no colour by default; success status
   colour      -Dstyle.color=always gives colour
-  ctrl-c      CTRL/C during a build: back to DCL, error status, Java gone
-  ctrl-y      CTRL/Y during a build: back to DCL, Java gone (MVN.EXE passes it to
-              Java as SIGINT); $STATUS is shown, not checked (NOTES N24)
+  ctrl-c      CTRL/C during a build: back to DCL, Java exited 130 (as MVN.EXE
+              reports it), Java gone
+  ctrl-y      the same for CTRL/Y (MVN.EXE passes it to Java as SIGINT)
+              $STATUS after either is shown, not checked (NOTES N24)
   ctrl-y-dcl  afterwards CTRL/Y interrupts DCL again
 The project is a copy of [.VMSPORT.TESTS.HELLO] in <workdir>[.TTYWORK.HELLO]; the
 local repository is <workdir>[.REPO], which test.sh's suites fill.
@@ -176,8 +177,13 @@ def main():
     check('colour', 'BUILD SUCCESS' in s.text() and coloured, s)
 
     # CTRL/C and CTRL/Y once the build is under way (after "Building hello",
-    # in the plugins).  Java runs its shutdown hooks and exits 130; MVN.EXE
-    # gives that an error status (%X1035A412) and Java is no longer there.
+    # in the plugins).  Java runs its shutdown hooks and exits 130, which
+    # MVN.EXE reports under MAVEN_VMS_TRACE ("wait status %X00008200") and
+    # turns into an error status (%X1035A412); Java is no longer there.
+    # DCL also acts on the key once the image ends, so $STATUS at the prompt
+    # is not reliable (NOTES N24): it is shown, not checked.
+    if not trace:
+        s.dcl('define/nolog maven_vms_trace 1')
     for name, key in (('ctrl-c', '\x03'), ('ctrl-y', '\x19')):
         s.mark()
         s.child.send('mvn %s clean package\r' % repo)
@@ -189,17 +195,17 @@ def main():
         check(name, started and back and stopped, s,
               'not started' if not started else 'no prompt' if not back
               else 'ran to the end' if not stopped else '')
+        m = re.search(r'Java ended, wait status (%X[0-9A-F]+)', s.text())
+        check(name + '-java-130', bool(m) and m.group(1) == '%X00008200', s,
+              'wait status %s' % (m.group(1) if m else 'not reported'))
         status = s.symbol('$status')
-        if key == '\x03':
-            check(name + '-status', status == '%X1035A412', s, 'status %s' % status)
-        else:
-            # DCL also acts on the CTRL/Y once MVN.EXE gives it back, after
-            # Java has stopped, so $STATUS is not reliable here (NOTES N24).
-            line = 'INFO %s-status %s' % (name, status)
-            print(line, flush=True)
-            log.write(line + '\n')
+        line = 'INFO %s-status %s' % (name, status)
+        print(line, flush=True)
+        log.write(line + '\n')
         sub = s.symbol('f$getjpi("","PRCCNT")')
         check(name + '-java-gone', sub == '0', s, '%s subprocesses' % sub)
+    if not trace:
+        s.dcl('deassign maven_vms_trace')
 
     # DCL has CTRL/Y back: it interrupts a READ.
     s.mark()

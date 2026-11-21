@@ -74,9 +74,10 @@ $ PIPE MVN -B package > build.log
   (`-s /DISK$USER/USERNAME/alt.xml`). A JDK toolchain's `jdkHome` is the JDK's directory
   as a Unix path, e.g. `/SYS$COMMON/openjdk$80` (NOTES N22).
 - **On a terminal:** CTRL/C and CTRL/Y both stop Maven (Java runs its shutdown hooks).
-  CTRL/C leaves an error status (`%X1035A412`, exit code 130). CTRL/Y goes to the
-  launcher, which passes it on to Java, so there is no CONTINUE; DCL then acts on it
-  too, interrupting a procedure that ran MVN, and `$STATUS` after it is not reliable. Colour is off unless you ask for
+  CTRL/Y goes to the launcher, which passes it on to Java, so there is no CONTINUE.
+  The launcher exits with an error status (`%X1035A412`, exit code 130), but DCL acts
+  on the key as well once MVN ends, so `$STATUS` at the prompt after either key is not
+  reliable, and a procedure that ran MVN is interrupted. Colour is off unless you ask for
   it (`-Dstyle.color=always`). Starting Maven takes a while: about 45 s on x86-64 before
   the first line of a build, all of it Java loading classes (NOTES N24).
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL

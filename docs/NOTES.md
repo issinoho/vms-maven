@@ -357,13 +357,19 @@ tools/ttytest.sh logs in over ssh in a pseudo-terminal and runs MVN from DCL.
   runs of 8. In a command procedure, 4 runs of 5 were interrupted before the line after
   MVN (as CTRL/Y in a procedure normally is), and one read `%X00000001`. So CTRL/Y
   stops Maven cleanly (shutdown hooks, no subprocess left) and interrupts an enclosing
-  procedure, but `$STATUS` after it is not reliable; CTRL/C's is (`%X1035A412`).
-  ttytest prints the CTRL/Y status instead of checking it.
+  procedure, but `$STATUS` after it is not reliable.
+- **CTRL/C too (2026-11-21, later).** CTRL/C's `$STATUS` was `%X1035A412` in 10 runs out
+  of 10 at first. Later the same day it was `%X00030001` in 4 of 7 runs with the N25
+  launcher and in 3 of 3 with the launcher committed before it, while MVN.EXE always saw
+  Java exit 130 (wait status `%X8200`). So DCL acts late on CTRL/C as well, and how often
+  shows varies. ttytest checks the exit code MVN.EXE got from Java (`MAVEN_VMS_TRACE`) and
+  prints `$STATUS` after both keys rather than checking it.
 
 ttytest on x86-64 with this launcher: 11/11 twice, and 10/11 twice on the CTRL/Y status
 above (version, build, plain output, success status, colour, CTRL/C and CTRL/Y: prompt
 back, no subprocess left, CTRL/C's `%X1035A412`, DCL's CTRL/Y back afterwards); with the
-CTRL/Y status shown rather than checked, 10 checks. IA64 was unreachable that night.
+CTRL/Y status shown rather than checked, 10 checks. IA64 was unreachable that night. Now 11 checks (Java exit 130 after each key
+checked, `$STATUS` after each shown): 11/11 on x86-64.
 
 ## N25. An empty record after every line in a PIPE or batch log (x86-64, 2026-11-21)
 

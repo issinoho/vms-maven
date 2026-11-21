@@ -60,8 +60,8 @@ toolchain finds JAVAC.EXE). All four suites pass on both nodes; one x86-64 plugi
 hung for 35 minutes after BUILD SUCCESS, at JVM exit (to be watched).
 Status 2026-11-21: tools/ttytest.sh (MVN on a terminal, N24). CTRL/C and CTRL/Y left
 a success status, and CTRL/Y killed Java outright; MVN.EXE now takes CTRL/Y and passes
-it to Java as SIGINT, and exits 128+ with an error status (reliable after CTRL/C; DCL
-acts on a CTRL/Y late, so $STATUS then is not). x86-64: tty passes. IA64 was
+it to Java as SIGINT, and exits 128+ with an error status (DCL acts on the key late,
+so $STATUS at the prompt is not reliable). x86-64: tty passes. IA64 was
 unreachable (no route to host): build and ttytest to run there.
 
 - Forked tests through MVNSH.EXE; small JVM defaults (D5). Done.
@@ -72,8 +72,8 @@ unreachable (no route to host): build and ttytest to run there.
 - Default local repository in SYS$LOGIN:[.m2]; settings.xml and toolchains.xml in
   ~/.m2 and conf/. Done (N22).
 - Interactive use from a terminal: output, colour off, CTRL/C and CTRL/Y. Done on
-  x86-64 (N24, tools/ttytest.sh); IA64 to run. $STATUS after CTRL/Y is not
-  reliable (DCL acts on the key late).
+  x86-64 (N24, tools/ttytest.sh); IA64 to run. $STATUS after CTRL/C or CTRL/Y
+  is not reliable (DCL acts on the key late).
 - 3.10.0's terminal output (N3).
 - Output in a PIPE or batch log: an empty record after every line (Java's writes to an
   inherited standard output are one record each); MVN.EXE relays it a line at a
