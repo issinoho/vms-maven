@@ -71,6 +71,12 @@ $ PIPE MVN -B package > build.log
   user.home), as on other systems. Give file options such as `-s` and `-f` Unix paths
   (`-s /DISK$USER/USERNAME/alt.xml`). A JDK toolchain's `jdkHome` is the JDK's directory
   as a Unix path, e.g. `/SYS$COMMON/openjdk$80` (NOTES N22).
+- **On a terminal:** CTRL/C and CTRL/Y both stop Maven (Java runs its shutdown hooks).
+  CTRL/C leaves an error status (`%X1035A412`, exit code 130). CTRL/Y goes to the
+  launcher, which passes it on to Java, so there is no CONTINUE; DCL then acts on it
+  too, interrupting a procedure that ran MVN, and `$STATUS` after it is not reliable. Colour is off unless you ask for
+  it (`-Dstyle.color=always`). Starting Maven takes a while: about 45 s on x86-64 before
+  the first line of a build, all of it Java loading classes (NOTES N24).
 - `MAVEN_OPTS`, `MAVEN_ARGS`, `JAVA_HOME`, `MAVEN_HOME` and `MAVEN_BASEDIR` may be DCL
   symbols or logical names. `MAVEN_VMS_TRACE` prints the Java command line.
 
@@ -90,7 +96,11 @@ tools/prepare.sh                 # fetch + verify, unpack, patch -> staging/
 tools/build.sh <ia64|x86>        # MVN.EXE and the patched jars, on the node
 tools/test.sh <node> [suite]     # batch job, uses Maven Central: smoke (default),
                                  # projects, plugins, config
+tools/ttytest.sh <node>          # MVN on a terminal: output, colour, CTRL/C, CTRL/Y
 ```
+
+ttytest.sh needs pexpect and pyte on the build host (`python3 -m venv cache/venv;
+cache/venv/bin/pip install pexpect pyte`, or set `TTYTEST_PYTHON`).
 
 `tools/nodes.conf` (from `nodes.conf.example`) names the nodes. Builds need VSI C and VSI
 OpenJDK 8 on the node; nothing Java is compiled on the build host.

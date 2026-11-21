@@ -309,3 +309,58 @@ VmsVirtualMachine.execute), and the JVM exited 3 s after that attach: the attach
 to have woken it. The rerun took 8:40 in all and did not hang. Not seen on IA64. If it
 comes back, look at the process with SHOW PROCESS/ID and ANALYZE/SYSTEM before any
 attach, since the attach itself let it go.
+
+## N24. Maven on a terminal: output, colour, startup time, CTRL/C and CTRL/Y (x86-64, 2026-11-21)
+
+tools/ttytest.sh logs in over ssh in a pseudo-terminal and runs MVN from DCL.
+
+- **Output** comes as Maven writes it, as on other systems. **Colour is off** on a
+  terminal, in a PIPE and with -B; `-Dstyle.color=always` gives Maven's ANSI colours,
+  which a VT terminal shows. (jansi has no native library for OpenVMS.) A SEARCH of a
+  build log shows its matches in bold: that is SEARCH, not Maven.
+- **Startup**: `mvn -v` takes 8.5 s; a one-module `validate` 45-50 s, of which Maven
+  reports 3 s. The rest comes before Maven's first log line, and the terminal makes no
+  difference (a PIPE is the same). `-verbose:class` shows no stall, just about 3,700 classes
+  at about 80 a second, and the Java subprocess had used 31 s of CPU after 20 s (several
+  threads): it is CPU-bound class loading. `-XX:TieredStopAtLevel=1`, `-Xverify:none`,
+  `-Xms64m` and all three together came out at 42-50 s, within the run-to-run noise
+  (43-50 s for the same command). The JDK has no CDS archive (`-Xshare:on` fails). A
+  `package` with a test is about 90 s.
+- **CTRL/C** reaches Java itself (its C RTL takes the terminal's CTRL/C as SIGINT): the
+  shutdown hooks run and Java exits 130. DCL echoes "Cancel" but leaves the launcher to
+  finish. The launcher then exited 130, and under `_POSIX_EXIT` the C RTL gives exit
+  codes of 128 and up the *success* severity (`exit(130)` is `%X0035A411`, `%C-S-`;
+  `exit(1)` is `%X1035A00A`), so a stopped build looked as if it had worked. MVN.EXE
+  now exits with the same code and the error severity (`%X1035A412` for 130), and
+  makes a child killed by a signal 128 + the signal.
+- **CTRL/Y** went to DCL, which interrupted MVN.EXE; the Java subprocess that
+  vfork/execv made was gone at once, with no shutdown hooks, and `waitpid()` reported
+  exit 0. CONTINUE then returned at once and `$STATUS` was success. (Running any image
+  after CTRL/Y, e.g. SHOW PROCESS, also runs the interrupted image down; DCL built-ins
+  such as WRITE do not.) Plain `java` from DCL survives CTRL/Y + CONTINUE: it is the
+  vfork/execv child that dies. MVN.EXE now turns off DCL's CTRL/Y with
+  `LIB$DISABLE_CTRL(LIB$M_CLI_CTRLY)` while Java runs, takes CTRL/Y itself with a
+  `IO$M_CTRLYAST` on SYS$COMMAND, and sends Java SIGINT from the AST: CTRL/Y now
+  stops Maven as CTRL/C does. It gives CTRL/Y back to DCL when Java ends (also as an
+  atexit handler), and only from a terminal and only when CTRL/Y was on to begin with
+  (SET NOCONTROL=Y is left alone). A user-mode CTRL/Y AST alone does not keep DCL from
+  interrupting as well; disabling DCL's CTRL/Y alone makes CTRL/Y do nothing.
+- The CTRL/Y setup must come **before** the vfork. Set up after Java had started, the
+  AST's `kill(pid, SIGINT)` made Java exit 0 at once, without its hooks (shown with a
+  test wrapper both ways round; the JVM options, the `JAVA$` settings, the C RTL features
+  and `_POSIX_EXIT` made no difference).
+
+- **DCL still sees the CTRL/Y, late.** With its CTRL/Y disabled DCL records the key and
+  acts on it when MVN.EXE gives CTRL/Y back, after Java has stopped. MVN.EXE always
+  saw Java end with 130 (`MAVEN_VMS_TRACE`: wait status `%X8200`, 1 CTRL/Y) and the
+  process had no image left, but `$STATUS` at the prompt was then `%CLI-S-NORMAL` in 6
+  runs of 8. In a command procedure, 4 runs of 5 were interrupted before the line after
+  MVN (as CTRL/Y in a procedure normally is), and one read `%X00000001`. So CTRL/Y
+  stops Maven cleanly (shutdown hooks, no subprocess left) and interrupts an enclosing
+  procedure, but `$STATUS` after it is not reliable; CTRL/C's is (`%X1035A412`).
+  ttytest prints the CTRL/Y status instead of checking it.
+
+ttytest on x86-64 with this launcher: 11/11 twice, and 10/11 twice on the CTRL/Y status
+above (version, build, plain output, success status, colour, CTRL/C and CTRL/Y: prompt
+back, no subprocess left, CTRL/C's `%X1035A412`, DCL's CTRL/Y back afterwards); with the
+CTRL/Y status shown rather than checked, 10 checks. IA64 was unreachable that night.
