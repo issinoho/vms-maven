@@ -17,12 +17,38 @@ Maven Central over TLS fine, then
 locked by another user` from `DefaultTrackingFileManager.delete()` (resolver 1.9.27): it
 deletes the file while its locked FileChannel is open. Patch 0001: on OpenVMS, close first.
 
-## N3. Maven 3.10.0 prints nothing to the terminal
+## N3. Maven 3.10.0 prints nothing to the terminal (cause found 2026-11-21)
 
 3.10.0 runs (`-l file` shows its output) but writes nothing to SYS$OUTPUT, even with `-X`.
 `-verbose:class` stops in jline's terminal setup (`org.jline.utils.OSUtils`, after the JNI
 and exec terminal providers are tried). To look at with 3.10 (D1); `-Dorg.jline.terminal.dumb=true`
 was not enough.
+
+**Cause (x86-64, 2026-11-21).** 3.10.0 sets up a jline 3.30 terminal in the background
+(maven-jline's FastTerminal) and replaces System.out with it. jline's exec provider
+asks whether each stream is a terminal by running `test -t <fd>` with `inheritIO()`.
+OpenVMS has no `test` program, and on VSI OpenJDK 8 a `ProcessBuilder.start()` of a
+program that does not exist, **with the standard output set to INHERIT**, ends the JVM
+on the spot: no exception, nothing more on either stream, status `%X10000001`. (The
+same start without INHERIT throws "Cannot run program ... no such file or directory",
+as it should. Probe class Probe: `test`/`nosuchcmd` with `inheritIO()` or
+`redirectOutput(INHERIT)`.) So Maven ended silently after parsing its command line,
+with a success status.
+
+- `-Dorg.jline.terminal.provider=dumb` (or `-Dorg.jline.terminal.exec=false`) skips the
+  exec provider: 3.10.0 then prints its output, colour off as in 3.9.
+- In a PIPE the output then came a character to a record: jansi's AnsiOutputStream
+  writes a byte at a time to an unbuffered FileOutputStream, and each write() was a
+  record (N25). MVN.EXE's line relay (N25) puts the lines together again; buffering in
+  jline's DumbTerminalProvider also worked, but is not needed with the relay.
+- 3.10.0 ships maven-resolver 2.0.24, without patch 0001: `package` failed on
+  "Failed to delete tracking file ... .lastUpdated ... file currently locked by another
+  user" (N2). Patch 0001 has to be redone for resolver 2.
+
+So a 3.10 port needs: the launcher to pass `-Dorg.jline.terminal.provider=dumb` (no
+jline provider but dumb can work on OpenVMS: there is no native library, `tty`, `stty`
+or `test`), patch 0001 for resolver 2.0.x, and the other patches checked against 3.10's
+sources. The JVM ending on a failed INHERIT start is VSI's to fix (to report to VSI).
 
 ## N4. DCL upper-cases procedure parameters
 

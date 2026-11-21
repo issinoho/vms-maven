@@ -74,7 +74,9 @@ unreachable (no route to host): build and ttytest to run there.
 - Interactive use from a terminal: output, colour off, CTRL/C and CTRL/Y. Done on
   x86-64 (N24, tools/ttytest.sh); IA64 to run. $STATUS after CTRL/C or CTRL/Y
   is not reliable (DCL acts on the key late).
-- 3.10.0's terminal output (N3).
+- 3.10.0's terminal output (N3): cause found. jline's `test -t` probe with inheritIO()
+  ends VSI's JVM when `test` does not exist; `-Dorg.jline.terminal.provider=dumb` gets
+  the output back. A 3.10 port also needs patch 0001 redone for resolver 2.0 (D1).
 - Output in a PIPE or batch log: an empty record after every line (Java's writes to an
   inherited standard output are one record each); MVN.EXE relays it a line at a
   time (N25).
