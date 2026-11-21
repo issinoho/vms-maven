@@ -37,6 +37,12 @@
    A local repository that does not exist yet is created with a version
    limit of 1, so files Maven rewrites there do not pile up versions.
 
+   From a terminal, CTRL/C reaches Java, which runs its shutdown hooks and
+   exits 130.  DCL's CTRL/Y would interrupt the launcher and kill Java
+   outright, so while Java runs the launcher takes CTRL/Y itself and passes
+   it on to Java as SIGINT: CTRL/Y stops a build as CTRL/C does.  Exit codes
+   of 128 and up (a signal) give an error status (NOTES N24).
+
    Environment variables are read with getenv(), so each may be a DCL symbol
    or a logical name.  MAVEN_VMS_TRACE (any value) prints the Java command.
 
@@ -51,13 +57,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <signal.h>
 #include <unistd.h>
 #include <wait.h>
 #include <unixlib.h>
 
+#include <dcdef.h>
 #include <descrip.h>
+#include <dvidef.h>
+#include <iodef.h>
 #include <jpidef.h>
 #include <lib$routines.h>
+#include <libclidef.h>
+#include <starlet.h>
 #include <ssdef.h>
 
 #define MAXARGS 1024
@@ -492,6 +504,74 @@ note_quotas (void)
            prog, fillm, pgfl, WANT_FILLM, WANT_PGFLQUOTA);
 }
 
+/* CTRL/Y while Java runs (NOTES N24).  DCL's CTRL/Y interrupts this image,
+   and the Java subprocess that vfork/execv made dies with it: no shutdown
+   hooks, and waitpid() reports exit 0, so CONTINUE finds nothing to go on
+   with and the build "succeeds".  (CTRL/C reaches Java itself.)  From a
+   terminal, the launcher turns off DCL's CTRL/Y while Java runs and takes a
+   CTRL/Y AST instead, which sends Java SIGINT, as CTRL/C would.  A process
+   that has CTRL/Y turned off already (SET NOCONTROL=Y) is left as it is.  */
+static pid_t java_pid;
+static unsigned short ctrly_chan;
+static int ctrly_taken;
+static int ctrly_count;
+
+static void ctrly_ast (int arg);
+static void ctrly_give_back (void);
+
+static int
+ctrly_arm (void)
+{
+  return sys$qiow (0, ctrly_chan, IO$_SETMODE | IO$M_CTRLYAST, 0, 0, 0,
+                   (void *) ctrly_ast, 0, 0, 0, 0, 0);
+}
+
+static void
+ctrly_ast (int arg)
+{
+  ctrly_count++;
+  if (java_pid > 0)
+    kill (java_pid, SIGINT);
+  ctrly_arm ();                 /* an AST is delivered once per enable */
+}
+
+static void
+ctrly_take (void)
+{
+  $DESCRIPTOR (cmd, "SYS$COMMAND");
+  unsigned int mask = LIB$M_CLI_CTRLY, old = 0;
+  int code = DVI$_DEVCLASS, devclass = 0;
+
+  if ((lib$getdvi (&code, 0, &cmd, &devclass, 0, 0) & 1)
+      && devclass == DC$_TERM                         /* not batch or network */
+      && (sys$assign (&cmd, &ctrly_chan, 0, 0) & 1))
+    {
+      if ((lib$disable_ctrl (&mask, &old) & 1) && (old & mask))
+        {
+          ctrly_taken = 1;
+          if (!(ctrly_arm () & 1))
+            ctrly_give_back ();
+        }
+      else
+        sys$dassgn (ctrly_chan);
+    }
+  if (getenv ("MAVEN_VMS_TRACE") != NULL)
+    fprintf (stderr, "%s: CTRL/Y %s\n", prog, ctrly_taken ? "taken" : "left to DCL");
+}
+
+/* Give CTRL/Y back to DCL; also an atexit() handler.  */
+static void
+ctrly_give_back (void)
+{
+  unsigned int mask = LIB$M_CLI_CTRLY;
+
+  if (!ctrly_taken)
+    return;
+  ctrly_taken = 0;
+  sys$dassgn (ctrly_chan);      /* cancels the AST */
+  lib$enable_ctrl (&mask, 0);
+}
+
 /* The process's parse style: 1 if EXTENDED.  */
 static int
 parse_extended (void)
@@ -545,6 +625,11 @@ main (int argc, char **argv)
       fprintf (stderr, "\n");
     }
 
+  /* CTRL/Y is taken before Java starts: taken once Java was running, the
+     SIGINT the AST sent made Java exit 0 at once, without its shutdown
+     hooks (NOTES N24).  */
+  atexit (ctrly_give_back);
+  ctrly_take ();
   fflush (stdout);
   fflush (stderr);
   pid = vfork ();
@@ -555,20 +640,41 @@ main (int argc, char **argv)
     }
   if (pid < 0)
     die ("cannot start Java (vfork)", strerror (errno));
-  if (waitpid (pid, &st, 0) < 0)
+  java_pid = pid;
+  while ((i = waitpid (pid, &st, 0)) < 0 && errno == EINTR)
+    ;
+  java_pid = 0;
+  ctrly_give_back ();
+  if (getenv ("MAVEN_VMS_TRACE") != NULL)
+    fprintf (stderr, "%s: Java ended, wait status %%X%08X, %d CTRL/Y\n",
+             prog, st, ctrly_count);
+  if (i < 0)
     die ("waiting for Java failed", strerror (errno));
   if (WIFEXITED (st))
     rc = WEXITSTATUS (st);
+  else if (WIFSIGNALED (st))
+    rc = 128 + WTERMSIG (st);
   else
     rc = 1;
   if (rc == 127)
     die ("cannot run Java", java);
-  if (rc != 0)
+  if (rc != 0 && rc < 128)
     note_quotas ();
-  if (rc != 0 && !parse_extended () && argc > 1)
+  if (rc != 0 && rc < 128 && !parse_extended () && argc > 1)
     fprintf (stderr, "%s: note: this process has the TRADITIONAL parse style, so "
              "arguments not in quotes reached Maven in lower case "
              "(SET PROCESS/PARSE_STYLE=EXTENDED, or quote them)\n", prog);
+  if (rc >= 128)
+    {
+      /* Stopped by a signal: 130 after CTRL/C or CTRL/Y.  exit(n) under
+         _POSIX_EXIT gives n >= 128 the success severity (%X0035A411 for
+         130), so a build stopped half-way would look as if it had worked.
+         The same code with the error severity and the inhibit-message
+         bit, as the C RTL gives n < 128 (%X1035A412).  */
+      fflush (stdout);
+      fflush (stderr);
+      sys$exit (0x1035A002 | (rc << 3));
+    }
   /* exit(), not return: only exit() maps the code to a VMS status under
      _POSIX_EXIT, and return 1 would be SS$_NORMAL.  */
   exit (rc);
