@@ -20,8 +20,8 @@ changes** over the signed upstream binary distribution:
   compiled on the node and put back into the jar they came from. Each patch is written so
   it can go upstream.
 
-**Status: in development** (docs/PLAN.md, Phase 3). The PCSI kit builds and installs on
-x86-64; there is no release yet.
+**Status:** [v3.9.16-vms1](https://github.com/issinoho/vms-maven/releases/tag/v3.9.16-vms1)
+for x86-64. The IA64 kit will follow (docs/PLAN.md).
 
 ## Using it
 

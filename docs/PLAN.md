@@ -94,3 +94,5 @@ unreachable (no route to host): build and ttytest to run there.
 
 - The family release process: tag v3.9.16-vms1, GitHub release with both kits and
   SHA256SUMS, entry in vms-grep/site/projects.json and the vms-grep README.
+  v3.9.16-vms1 released for x86-64 only, while the IA64 node is unavailable; the IA64
+  kit is added to that release once Phase 2's IA64 runs and installcheck.sh pass there.
