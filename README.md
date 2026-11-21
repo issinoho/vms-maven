@@ -20,9 +20,20 @@ changes** over the signed upstream binary distribution:
   compiled on the node and put back into the jar they came from. Each patch is written so
   it can go upstream.
 
-**Status: in development** (docs/PLAN.md, Phase 1). There is no kit yet.
+**Status: in development** (docs/PLAN.md, Phase 3). The PCSI kit builds and installs on
+x86-64; there is no release yet.
 
 ## Using it
+
+From the kit (`tools/kit.sh`):
+
+```dcl
+$ PRODUCT INSTALL MAVEN /SOURCE=<directory with the kit>
+$ @MAVEN$ROOT:[000000]MAVEN$SETUP.COM    ! defines MVN; sets up Java if needed
+```
+
+`MAVEN$STARTUP.COM` (in `SYS$STARTUP`) defines `MAVEN$ROOT` at boot; the kit's
+`README.VMS` has the rest. From a build tree:
 
 ```dcl
 $ @SYS$STARTUP:OPENJDK$SETUP.COM          ! Java 8
@@ -100,6 +111,8 @@ tools/build.sh <ia64|x86>        # MVN.EXE and the patched jars, on the node
 tools/test.sh <node> [suite]     # batch job, uses Maven Central: smoke (default),
                                  # projects, plugins, config
 tools/ttytest.sh <node>          # MVN on a terminal: output, colour, CTRL/C, CTRL/Y
+tools/kit.sh <node>              # build, then the PCSI kit -> out/kits/
+tools/installcheck.sh <node>     # install the kit, smoke-test it, remove it
 ```
 
 ttytest.sh needs pexpect and pyte on the build host (`python3 -m venv cache/venv;

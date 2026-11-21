@@ -1,0 +1,71 @@
+Apache Maven @VERSION@ for OpenVMS (@KITVERSION@, @ARCH@)
+=====================================================
+
+Apache Maven (https://maven.apache.org) running on VSI OpenJDK 8.  This kit
+is the upstream binary distribution with a few patched classes and MVN.EXE, a
+launcher that does what bin/mvn does.  Sources, patches and notes:
+https://github.com/issinoho/vms-maven
+
+Installation
+------------
+
+    $ PRODUCT INSTALL MAVEN /SOURCE=<directory with the kit>
+
+The Maven home is MAVEN$ROOT:[000000] (the installed [MAVEN] directory).  To
+define MAVEN$ROOT at every boot, add to SYS$MANAGER:SYSTARTUP_VMS.COM:
+
+    $ @SYS$STARTUP:MAVEN$STARTUP.COM
+
+and for each user, to LOGIN.COM (or SYS$MANAGER:SYLOGIN.COM):
+
+    $ @MAVEN$ROOT:[000000]MAVEN$SETUP.COM
+
+MAVEN$SETUP.COM defines MVN and, when no Java is set up, runs
+SYS$STARTUP:OPENJDK$SETUP.COM.  PRODUCT REMOVE MAVEN removes it all.
+
+Using it
+--------
+
+    $ SET PROCESS/PARSE_STYLE=EXTENDED       ! keep the case of arguments
+    $ PIPE MVN -B package > build.log
+
+- Under the TRADITIONAL parse style (the default, and what batch jobs get),
+  arguments not in quotes reach Maven in lower case ("-DskipTests" needs the
+  quotes).  The launcher prints a note when Maven then fails.
+- Give file options Unix paths: -f /DISK$USER/ME/proj/pom.xml.  Java on
+  OpenVMS does not take [.X]Y.Z.
+- To keep a build's output in a file, use PIPE MVN ... > file, not
+  DEFINE/USER SYS$OUTPUT (each process in the chain writes its own version).
+- Quotas: Java wants FILLM 4096 and PGFLQUOTA 2097152.  A forked test JVM
+  shares them with Maven's, so with a default account's quotas larger builds
+  fail ("unable to create new native thread"); the launcher says so.
+  MAVEN_OPTS and .mvn/jvm.config set the JVM's sizes.
+- The local repository is SYS$LOGIN:[.m2.repository] (or -Dmaven.repo.local).
+  The launcher creates a missing one with a version limit of 1.  For one that
+  already exists:
+      $ SET DIRECTORY/VERSION_LIMIT=1 SYS$LOGIN:[.m2.repository...]
+      $ SET FILE/VERSION_LIMIT=1 SYS$LOGIN:[.m2.repository...]*.*;
+      $ PURGE SYS$LOGIN:[.m2.repository...]
+- Settings: MAVEN$ROOT:[CONF]settings.xml and toolchains.xml for the system,
+  SYS$LOGIN:[.m2]settings.xml and toolchains.xml for a user.  The system file
+  has an "openvms" profile (forked test JVM sizes, the javadoc tool, POSIX
+  tar); keep a copy of local changes to it, since a new kit replaces it.  A JDK
+  toolchain's jdkHome is a Unix path, e.g. /SYS$COMMON/openjdk$80.
+- Plugins that start /bin/sh get MVNSH.EXE, and the bare names java, javac,
+  javadoc and jar run the JDK's images.  exec:exec does not work (use
+  exec:java), and antrun's <java fork> splits an argument with a space.
+- On a terminal, CTRL/C and CTRL/Y stop Maven (Java runs its shutdown hooks).
+  $STATUS afterwards is not reliable.  Colour is off unless asked for
+  (-Dstyle.color=always).  Maven takes some 45 s to start on x86-64.
+- MAVEN_OPTS, MAVEN_ARGS, JAVA_HOME, MAVEN_HOME and MAVEN_BASEDIR may be DCL
+  symbols or logical names; MAVEN_VMS_TRACE prints the Java command line.
+
+Not in the kit: the Unix and Windows scripts of bin/ (mvn, mvnDebug, mvnyjp;
+for debugging, put -agentlib:jdwp=... in MAVEN_OPTS) and jansi's Windows DLLs.
+
+Licence
+-------
+
+Maven and its jars are under the Apache License 2.0: MAVEN$ROOT:[000000]LICENSE.
+and NOTICE., and the lib/*.license files.  The OpenVMS changes are under the
+same licence.

@@ -33,9 +33,12 @@ $ repo = f$parse(home,,,"device") + repo + ".REPO]"
 $ olddef = f$environment("default")
 $ if f$type(java) .eqs. "" then @SYS$STARTUP:OPENJDK$SETUP.COM
 $ mvn = "$" + home - "]" + ".BIN]MVN.EXE"
+$! P1: another launcher to test, e.g. an installed kit's MAVEN$ROOT:[BIN]MVN.EXE.
+$ if p1 .nes. "" then mvn = "$" + p1
 $ passed = 0
 $ failed = 0
 $ write sys$output "SMOKE: ''home' on ''f$getsyi("arch_name")' ''f$getsyi("version")'"
+$ write sys$output "SMOKE: launcher ''f$extract(1,999,mvn)'"
 $!
 $ spec = home
 $ gosub to_unix

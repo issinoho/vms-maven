@@ -1,0 +1,31 @@
+--
+-- PCSI product description for Apache Maven on OpenVMS.
+-- Template: tools/prepare.sh substitutes @PRODUCER@, @BASE@ and @PCSIVERSION@, and
+-- puts the Maven tree's directories and files in place of @TREE@ (tools/gen_kit.py).
+-- [MAVEN] is the Maven home (MAVEN$ROOT:[000000]).  PCSI looks material up by
+-- name in one flat directory, so each tree file has a material name of its own
+-- (source [000000]Rnnnnn.DAT; MAKE_KIT.COM copies them there).  PCSI stores
+-- names in upper case: MAVEN$STARTUP.COM INSTALL renames them back (MAVEN$CASE.COM).
+--
+product @PRODUCER@ @BASE@ MAVEN @PCSIVERSION@ full ;
+
+    information RELEASE_NOTES phase after ;
+
+    directory [MAVEN] ;
+    file [SYS$STARTUP]MAVEN$STARTUP.COM ;
+    file [MAVEN]MAVEN$SETUP.COM ;
+    file [MAVEN]MAVEN$CASE.COM ;
+    file [MAVEN]README.VMS ;
+
+@TREE@
+
+    -- Define MAVEN$ROOT, give the files their real names and print the
+    -- post-installation tasks (PCSI shows only the title of an information
+    -- message unless /HELP is given).
+    execute postinstall "@PCSI$DESTINATION:[SYS$STARTUP]MAVEN$STARTUP.COM INSTALL" interactive ;
+    -- On removal, deassign MAVEN$ROOT.
+    execute install "CONTINUE" remove "@PCSI$DESTINATION:[SYS$STARTUP]MAVEN$STARTUP.COM REMOVE" ;
+
+    information POST_INSTALL phase after ;
+
+end product ;

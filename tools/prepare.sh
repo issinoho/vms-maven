@@ -60,4 +60,34 @@ cp -a "$top/overlay/." "$stage/"
 printf 'MAVEN_VERSION=%s\nKIT_VERSION=%s-vms%s\n' "$UPSTREAM_VERSION" "$UPSTREAM_VERSION" \
     "$VMS_PATCH_LEVEL" > "$stage/vmsport/VERSION.ENV"
 
+# --- PCSI kit inputs (vmsport/kit/MAKE_KIT.COM builds the kit on each node) ----
+step "PCSI kit inputs"
+: "${KIT_PRODUCER:=ISSINOHO}"
+# D6: 3.9.16-vms1 is V3.9-16E1 (the patch number is the PCSI update, our patch
+# level the ECO, as in the sibling ports).
+IFS=. read -r major minor update _ <<< "$UPSTREAM_VERSION"
+pcsiversion="V$major.$minor-${update:-0}E$VMS_PATCH_LEVEL"
+kitversion="$UPSTREAM_VERSION-vms$VMS_PATCH_LEVEL"
+kit=$stage/vmsport/kit
+python3 -I "$top/tools/gen_kit.py" "$stage" "$kit" | sed 's/^/prepare: /'
+subst() {
+    sed -e "s/@PRODUCER@/$KIT_PRODUCER/g" -e "s/@BASE@/$1/g" \
+        -e "s/@PCSIVERSION@/$pcsiversion/g" -e "s/@VERSION@/$UPSTREAM_VERSION/g" \
+        -e "s/@KITVERSION@/$kitversion/g" -e "s/@ARCH@/$2/g"
+}
+for base in I64VMS X86VMS; do
+    # awk, not sed's "r file": BSD sed (macOS) differs.
+    subst $base "" < "$kit/maven.pcsi\$desc_template" |
+        awk -v files="$kit/tree.pdf" '/^@TREE@$/ { while ((getline l < files) > 0) print l; next } { print }' \
+        > "$kit/MAVEN-$base.PCSI\$DESC"
+    subst $base "" < "$kit/maven.pcsi\$text_template" > "$kit/MAVEN-$base.PCSI\$TEXT"
+done
+rm -f "$kit/maven.pcsi\$desc_template" "$kit/maven.pcsi\$text_template" "$kit/tree.pdf"
+mv "$kit/maven\$startup.com" "$kit/MAVEN\$STARTUP.COM"
+mv "$kit/maven\$setup.com" "$kit/MAVEN\$SETUP.COM"
+mv "$kit/make_kit.com" "$kit/MAKE_KIT.COM"
+subst "" "IA64 and x86-64" < "$kit/readme.vms" > "$kit/README.VMS"; rm -f "$kit/readme.vms"
+printf 'KIT_PRODUCER=%s\nPCSI_VERSION=%s\nKIT_VERSION=%s\n' "$KIT_PRODUCER" "$pcsiversion" \
+    "$kitversion" > "$kit/KIT.ENV"
+
 step "staged $stage"

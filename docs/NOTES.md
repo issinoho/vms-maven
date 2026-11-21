@@ -436,3 +436,29 @@ whole lines there, and with the relay the images run after MVN in the same proce
 their output (DUMP and TYPE printed nothing; DCL's WRITE did). MVN.EXE looks for a
 user-mode SYS$OUTPUT in the process table (`$TRNLNM`, `LNM$_ACMODE`). The smoke test's
 `mvn -v` checks that its PIPE output has no empty record.
+
+## N26. The PCSI kit (x86-64, 2026-11-21)
+
+- Layout: the kit installs the Maven tree as [MAVEN] under the destination, with
+  MAVEN$ROOT (concealed, rooted) for it, so MAVEN$ROOT:[000000] is the Maven home and
+  MVN.EXE finds it as it does in a build tree (the parent of [.BIN]; `mvn -v` reports
+  the physical path, /<device>/SYS0/SYSCOMMON/MAVEN). MAVEN$STARTUP.COM and
+  MAVEN$SETUP.COM follow vms-vim's.
+- Material: PCSI looks material up by name in one flat directory (vms-vim N17), and the
+  tree has five README.txt, so tools/gen_kit.py gives every tree file a material name
+  (Rnnnnn.DAT) and writes KIT_MATERIAL.COM, the COPYs MAKE_KIT.COM runs. Names like
+  maven-core-3.9.16.jar go in the description as MAVEN-CORE-3^.9^.16.JAR.
+- Names: PCSI installs every file in upper case. MVN.EXE finds plexus-classworlds
+  without regard to case, but classworlds loads `lib/*.jar` by a case-sensitive match,
+  and MAVEN-CORE-3^.9^.16.JAR does not end in ".jar". MAVEN$STARTUP.COM INSTALL runs
+  MAVEN$CASE.COM (generated), which RENAMEs the 86 files with lower-case letters back
+  (the extended parse style keeps the case). Directories keep upper-case names: Maven
+  only looks them up, and renaming them needs delete access PCSI does not give
+  (vms-vim N20).
+- Left out: bin/mvn, mvn.cmd, mvnDebug, mvnDebug.cmd, mvnyjp and jansi's Windows DLLs,
+  none of which can run here, and [.VMSPORT].
+- First install check (tools/installcheck.sh): PRODUCT INSTALL took 20 s; all 51 jars
+  have their real names; the smoke test passed 8/8 against MAVEN$ROOT:[BIN]MVN.EXE
+  (TEST_SMOKE.COM's P1); PRODUCT REMOVE deassigned MAVEN$ROOT and left no files,
+  no [MAVEN] directory and no startup procedure. %PCSI-I-CANNOTVAL: the kit is not
+  signed, as in the rest of the family.

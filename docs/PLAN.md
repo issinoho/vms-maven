@@ -87,6 +87,8 @@ unreachable (no route to host): build and ttytest to run there.
 - PCSI kit ISSINOHO MAVEN (D3, D6): the distribution with the patched jars, MVN.EXE,
   MAVEN$STARTUP.COM (MAVEN$ROOT), MAVEN$SETUP.COM (MVN symbol, needs Java), README.VMS.
 - tools/kit.sh and tools/installcheck.sh (install, smoke test, clean removal) on both nodes.
+  Done on x86-64 (N26): the kit installs, its MVN passes the smoke test, and PRODUCT
+  REMOVE leaves nothing behind. IA64 to run.
 
 ## Phase 4: release
 

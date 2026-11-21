@@ -1,0 +1,19 @@
+=product @PRODUCER@ @BASE@ MAVEN @PCSIVERSION@ full
+1 'PRODUCER
+=prompt @PRODUCER@
+1 'PRODUCT
+=prompt Apache Maven @VERSION@ for OpenVMS
+1 'NOTICE
+=prompt Apache Maven is under the Apache License 2.0; see [MAVEN]LICENSE.
+1 RELEASE_NOTES
+=prompt Documentation is in [MAVEN]README.VMS under the installation directory.
+1 POST_INSTALL
+=prompt Post-installation tasks for Apache Maven
+    At system startup: to define MAVEN$ROOT at every boot, add this line to
+    SYS$MANAGER:SYSTARTUP_VMS.COM:
+    $ @SYS$STARTUP:MAVEN$STARTUP.COM
+    For each user: to define the MVN command, add this line to LOGIN.COM:
+    $ @MAVEN$ROOT:[000000]MAVEN$SETUP.COM
+    Maven needs VSI OpenJDK 8 (SYS$STARTUP:OPENJDK$SETUP.COM).
+
+PRODUCT REMOVE MAVEN removes the product and deassigns MAVEN$ROOT.
