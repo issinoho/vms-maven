@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.svg" alt="Apache Maven for OpenVMS: a DECterm window running MVN -B package to BUILD SUCCESS, then the built jar with java" width="100%">
+</p>
+
 # Apache Maven for OpenVMS
 
 ![OpenVMS](https://img.shields.io/badge/OpenVMS-IA64%20%7C%20x86--64-blue)
@@ -120,6 +124,12 @@ cache/venv/bin/pip install pexpect pyte`, or set `TTYTEST_PYTHON`).
 
 `tools/nodes.conf` (from `nodes.conf.example`) names the nodes. Builds need VSI C and VSI
 OpenJDK 8 on the node; nothing Java is compiled on the build host.
+
+## Artwork
+
+`docs/images/banner.svg` was made for this project in the style of classic DECwindows and
+VT terminals, like those of its sibling ports. The "mvn" mark in it is our own drawing, not
+Apache Maven's logo.
 
 ## Licence
 
