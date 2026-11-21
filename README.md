@@ -42,7 +42,9 @@ $ PIPE MVN -B package > build.log
   build fails. Its default JVM sizes are small for the same reason; `MAVEN_OPTS` and
   `.mvn/jvm.config` override them.
 - To keep a build's output in a file, use `PIPE MVN ... > file`: with
-  `DEFINE/USER SYS$OUTPUT`, each process in the chain writes its own version.
+  `DEFINE/USER SYS$OUTPUT`, each process in the chain writes its own version. In a PIPE or
+  a batch log the launcher passes Maven's output on a line at a time; Java on its own wrote
+  an empty record after every line there (NOTES N25).
 - **Plugins that run programs:** the launcher also maps the bare names `java`, `javac`,
   `javadoc` and `jar` to the JDK's images, since Ant (antrun) and others start `java`
   when they find no `bin/java` (it is `JAVA.EXE`). The `openvms` profile in

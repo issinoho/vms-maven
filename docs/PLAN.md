@@ -75,6 +75,9 @@ unreachable (no route to host): build and ttytest to run there.
   x86-64 (N24, tools/ttytest.sh); IA64 to run. $STATUS after CTRL/Y is not
   reliable (DCL acts on the key late).
 - 3.10.0's terminal output (N3).
+- Output in a PIPE or batch log: an empty record after every line (Java's writes to an
+  inherited standard output are one record each); MVN.EXE relays it a line at a
+  time (N25).
 - Record failures in NOTES; patch what is Maven's, document what is a plugin's.
 
 ## Phase 3: the kit

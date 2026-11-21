@@ -364,3 +364,43 @@ ttytest on x86-64 with this launcher: 11/11 twice, and 10/11 twice on the CTRL/Y
 above (version, build, plain output, success status, colour, CTRL/C and CTRL/Y: prompt
 back, no subprocess left, CTRL/C's `%X1035A412`, DCL's CTRL/Y back afterwards); with the
 CTRL/Y status shown rather than checked, 10 checks. IA64 was unreachable that night.
+
+## N25. An empty record after every line in a PIPE or batch log (x86-64, 2026-11-21)
+
+`PIPE mvn ... > file` and a batch job's log had an empty record after each line Maven
+logged (`DUMP/RECORD`: "[INFO] Scanning for projects..." then a 0-byte record). SEARCH
+and the tests did not mind, but `TYPE` and a batch log showed every line double-spaced.
+On a terminal the lines were right.
+
+The cause is how VSI Java writes to a standard output it **inherits** through
+vfork/execv. Probe class (Rec2: `print("a"); print("-b\n")`, `FileOutputStream` on
+`FileDescriptor.out` with several writes per line, one byte at a time):
+
+- `PIPE java -cp . Rec2 > f` (DCL starts the JVM): writes are joined up to each LF, one
+  record per line, a byte at a time too.
+- The same class under MVN.EXE (a Maven home whose `m2.conf` starts it), or under a
+  ten-line vfork/execv test program: **one record per write()**, a write of just "\n" an
+  empty record, a byte at a time one character per record. In a PIPE and a batch log
+  alike. `decc$set_child_standard_streams(0, -1, -1)` and `(-1, -1, -1)` made no difference.
+- `PrintStream.println(s)` writes `s` and then the line end, with a flush between them
+  (an autoflush PrintStream flushes after each `write(byte[])`), hence the empty records.
+  `DEFINE/USER SYS$OUTPUT file` was already right under MVN.EXE.
+
+MVN.EXE now gives Java a C RTL pipe for its standard output when its own is not a
+terminal, and copies what comes through to its own standard output with one `write()`
+for each line. It points its fd 1 at the pipe with `dup2()` just for the vfork/execv and
+then puts it back. (`decc$set_child_standard_streams(-1, pipe, -1)` also gave Java the
+pipe, but once it is called Java opens its standard error by name: `PIPE mvn 2> file`
+then got a new version of the file for Java, and the launcher's own messages stayed in the
+old one.) The pipe gives Java's writes exactly (message by message) and ends when Java
+exits (OpenVMS deletes Java's subprocesses with it, so nothing holds the pipe open after).
+Records are then whole lines in a PIPE and a batch log, and the exit status is unchanged.
+A partial line waits for its line end (or 32 KB); on a terminal there is no pipe, so a
+prompt shows at once. The standard error is not relayed (Maven logs everything to the
+standard output; a JVM error's lines may still be double-spaced in a log).
+
+Under `DEFINE/USER SYS$OUTPUT file` there is no relay either: the records were already
+whole lines there, and with the relay the images run after MVN in the same procedure lost
+their output (DUMP and TYPE printed nothing; DCL's WRITE did). MVN.EXE looks for a
+user-mode SYS$OUTPUT in the process table (`$TRNLNM`, `LNM$_ACMODE`). The smoke test's
+`mvn -v` checks that its PIPE output has no empty record.

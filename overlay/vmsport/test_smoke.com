@@ -68,7 +68,7 @@ $ spec = work - "]" + ".HELLO]"
 $ gosub to_unix
 $ uhello = uspec
 $!
-$! 1. mvn -v: the launcher finds Java and the Maven home.
+$! 1. mvn -v: the launcher finds Java and the Maven home; whole lines in a PIPE.
 $ t = "mvn -v"
 $ pipe mvn -v > t1.out
 $ st = $status
@@ -78,6 +78,10 @@ $ ok1 = found
 $! The launcher reports the home as the image's physical path.
 $ want = "Maven home: /"
 $ gosub has
+$ ok1 = ok1 .and. found
+$! Captured by PIPE, one record per line: no empty record after each (NOTES N25).
+$ fil = "t1.out"
+$ gosub no_empty
 $ if ok1 .and. found .and. st then gosub pass
 $ if .not. (ok1 .and. found .and. st) then gosub fail
 $!
@@ -210,6 +214,23 @@ $   found = 0
 $   if f$search(fil) .eqs. "" then return
 $   search/nooutput 'fil' "''want'"
 $   if $severity .eq. 1 then found = 1
+$   return
+$!
+$! no_empty: FOUND = 1 if FIL has records and none of them is empty.
+$ no_empty:
+$   found = 0
+$   if f$search(fil) .eqs. "" then return
+$   open/read ne_f 'fil'
+$   nrec = 0
+$ ne_loop:
+$   read/end_of_file=ne_end ne_f ne_rec
+$   nrec = nrec + 1
+$   if ne_rec .nes. "" then goto ne_loop
+$   close ne_f
+$   return
+$ ne_end:
+$   close ne_f
+$   if nrec .gt. 0 then found = 1
 $   return
 $!
 $! to_unix: SPEC (DEV:[A.B]) -> USPEC (/DEV/A/B), with ODS-5 "^." as ".".

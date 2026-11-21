@@ -43,6 +43,11 @@
    it on to Java as SIGINT: CTRL/Y stops a build as CTRL/C does.  Exit codes
    of 128 and up (a signal) give an error status (NOTES N24).
 
+   When its standard output is a PIPE or a batch log (not a terminal, nor
+   DEFINE/USER SYS$OUTPUT), the launcher passes Java's output on a line at a time: Java writes one
+   record for each write() to an output it inherits, which put an empty
+   record after every line Maven logged (NOTES N25).
+
    Environment variables are read with getenv(), so each may be a DCL symbol
    or a logical name.  MAVEN_VMS_TRACE (any value) prints the Java command.
 
@@ -69,6 +74,8 @@
 #include <jpidef.h>
 #include <lib$routines.h>
 #include <libclidef.h>
+#include <lnmdef.h>
+#include <psldef.h>
 #include <starlet.h>
 #include <ssdef.h>
 
@@ -572,6 +579,128 @@ ctrly_give_back (void)
   lib$enable_ctrl (&mask, 0);
 }
 
+/* Java's standard output when it is not a terminal (NOTES N25).  A Java
+   started with vfork/execv writes one record for each write() to the
+   standard output it inherits (a PIPE mailbox, a batch log, a file):
+   PrintStream.println() writes the text and then the line end, so every line
+   Maven logs was followed by an empty record, and text written a byte at a
+   time came out a character to a line.  (A JVM that DCL runs itself joins
+   its writes up to each line end.)  So the launcher gives Java a pipe for its
+   standard output and writes what comes through it to its own, one line to
+   each write().  On a terminal Java writes straight to it: lines come out
+   right there, and a prompt must not wait for its line end.  Nor under
+   DEFINE/USER SYS$OUTPUT (below).  The standard error is left alone.  */
+static int relay_in = -1;
+static int relay_out_fd = -1;
+static int relay_saved = -1;
+
+/* DEFINE/USER SYS$OUTPUT: a user-mode SYS$OUTPUT in the process table.
+   Java's records there were whole lines already, and with the relay the
+   images run after MVN lost their output.  */
+static int
+user_mode_output (void)
+{
+  $DESCRIPTOR (table, "LNM$PROCESS_TABLE");
+  $DESCRIPTOR (name, "SYS$OUTPUT");
+  unsigned char mode = PSL$C_KERNEL, acmode = PSL$C_USER;
+  unsigned short len = 0;
+  struct { unsigned short len, code; void *addr; unsigned short *rlen; } items[2] = {
+    { sizeof mode, LNM$_ACMODE, &mode, &len }, { 0, 0, 0, 0 } };
+  if (!(sys$trnlnm (0, &table, &name, &acmode, items) & 1))
+    return 0;
+  return mode == PSL$C_USER;
+}
+
+/* Before the vfork: point this image's fd 1 at a new pipe, so that execv
+   hands Java the pipe (the standard input and error are passed as before:
+   decc$set_child_standard_streams would make Java open its standard error
+   by name, which writes a new version of a `2> file`).  */
+static void
+relay_setup (void)
+{
+  int p[2];
+  if (isatty (1) || user_mode_output () || pipe (p) != 0)
+    return;
+  fflush (stdout);
+  relay_saved = dup (1);
+  if (relay_saved < 0 || dup2 (p[1], 1) < 0)
+    {
+      if (relay_saved >= 0)
+        close (relay_saved);
+      relay_saved = -1;
+      close (p[0]);
+      close (p[1]);
+      return;
+    }
+  relay_in = p[0];
+  relay_out_fd = p[1];
+}
+
+/* After the vfork: fd 1 is this image's standard output again.  */
+static void
+relay_restore (void)
+{
+  if (relay_saved < 0)
+    return;
+  dup2 (relay_saved, 1);
+  close (relay_saved);
+  relay_saved = -1;
+  close (relay_out_fd);
+  relay_out_fd = -1;
+}
+
+static void
+write_all (const char *s, size_t n)
+{
+  ssize_t w;
+  while (n > 0)
+    {
+      w = write (1, s, n);
+      if (w < 0 && errno == EINTR)
+        continue;
+      if (w <= 0)
+        return;
+      s += w;
+      n -= w;
+    }
+}
+
+/* Copy Java's output to this image's, a line at a time, until Java and
+   whatever it started have closed the pipe (when Java exits: OpenVMS deletes
+   a process's subprocesses with it).  */
+static void
+relay (void)
+{
+  static char line[32768];
+  char buf[8192];
+  size_t len = 0;
+  ssize_t n, i;
+
+  if (relay_in < 0)
+    return;
+  for (;;)
+    {
+      n = read (relay_in, buf, sizeof buf);
+      if (n < 0 && errno == EINTR)
+        continue;
+      if (n <= 0)
+        break;
+      for (i = 0; i < n; i++)
+        {
+          line[len++] = buf[i];
+          if (buf[i] == '\n' || len == sizeof line)
+            {
+              write_all (line, len);
+              len = 0;
+            }
+        }
+    }
+  if (len > 0)
+    write_all (line, len);
+  close (relay_in);
+  relay_in = -1;
+}
+
 /* The process's parse style: 1 if EXTENDED.  */
 static int
 parse_extended (void)
@@ -632,15 +761,22 @@ main (int argc, char **argv)
   ctrly_take ();
   fflush (stdout);
   fflush (stderr);
+  relay_setup ();
+  if (getenv ("MAVEN_VMS_TRACE") != NULL)
+    fprintf (stderr, "%s: output %s (isatty %d)\n", prog,
+             relay_in >= 0 ? "relayed a line at a time" : "straight to Java",
+             isatty (1));
   pid = vfork ();
   if (pid == 0)
     {
       execv (java, jargv);
       _exit (127);
     }
+  relay_restore ();
   if (pid < 0)
     die ("cannot start Java (vfork)", strerror (errno));
   java_pid = pid;
+  relay ();
   while ((i = waitpid (pid, &st, 0)) < 0 && errno == EINTR)
     ;
   java_pid = 0;
